@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>RIU Coil Live Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body{
+    --bg:#EEF0F3; --surface:#FFFFFF; --surface-2:#F5F6F8;
+    --ink:#1E2430; --ink-soft:#5B6472; --ink-faint:#8A93A1;
+    --accent:#D6541F; --accent-ink:#7A2E0F;
+    --steel:#2F6690; --steel-soft:#E5EEF3;
+    --success:#2F8F5B; --success-soft:#E4F4EC;
+    --warning:#C98A1F; --warning-soft:#FBF1DF;
+    --danger:#C1352B; --danger-soft:#FBE7E5;
+    --border:#DBE0E6; --border-soft:#E9ECEF;
+    --radius:10px;
+    font-family:'IBM Plex Sans',sans-serif;
+    background:var(--bg); color:var(--ink);
+    min-height:100vh; width:100%;
+  }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  .disp{ font-family:'Oswald',sans-serif; letter-spacing:0.02em; }
+  .material-icons{ font-size:16px; vertical-align:middle; line-height:1; }
+
+  .rd-header{ background:linear-gradient(180deg,#232A36 0%, #1A2028 100%); color:#F1F3F5; padding:20px 24px 18px; position:relative; overflow:hidden; }
+  .rd-header::before{ content:''; position:absolute; inset:0; background-image:radial-gradient(circle at 2px 2px, rgba(255,255,255,0.04) 1px, transparent 1px); background-size:14px 14px; pointer-events:none; }
+  .rd-header-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; position:relative; z-index:1; }
+  .rd-title{ display:flex; align-items:center; gap:12px; }
+  .rd-badge{ width:44px; height:44px; border-radius:8px; background:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25); }
+  .rd-title h1{ font-size:22px; margin:0; font-weight:700; text-transform:uppercase; }
+  .rd-title p{ margin:2px 0 0; font-size:12.5px; color:#AEB6C2; font-weight:400; }
+  .rd-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .rd-hazard{ height:6px; width:100%; background:repeating-linear-gradient(135deg, var(--accent) 0 14px, #1A2028 14px 28px); opacity:0.9; }
+
+  .btn{ border:1px solid transparent; border-radius:7px; padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:all .15s ease; white-space:nowrap; font-family:'IBM Plex Sans',sans-serif; }
+  .btn:active{ transform:translateY(1px); }
+  .btn-accent{ background:var(--accent); color:#fff; }
+  .btn-accent:hover{ background:#BE4816; }
+  .btn-ghost{ background:rgba(255,255,255,0.08); color:#F1F3F5; border-color:rgba(255,255,255,0.18); }
+  .btn-ghost:hover{ background:rgba(255,255,255,0.14); }
+  .btn-outline{ background:var(--surface); color:var(--ink); border-color:var(--border); }
+  .btn-outline:hover{ background:var(--surface-2); }
+  .btn-steel{ background:var(--steel); color:#fff; }
+  .btn-steel:hover{ background:#254F70; }
+  .btn-sm{ padding:6px 10px; font-size:12px; }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  .rd-empty{ max-width:640px; margin:60px auto; text-align:center; padding:40px 28px; background:var(--surface); border:1.5px dashed var(--border); border-radius:14px; }
+  .rd-empty h2{ font-family:'Oswald',sans-serif; font-size:20px; margin:14px 0 6px; }
+  .rd-empty p{ color:var(--ink-soft); font-size:13.5px; margin:0 0 20px; line-height:1.6; }
+  .rd-drop{ border:2px dashed var(--steel); border-radius:10px; padding:26px; background:var(--steel-soft); cursor:pointer; transition:.15s; }
+  .rd-drop:hover{ background:#DCEAF1; }
+
+  .rd-body{ padding:20px 24px 60px; max-width:1600px; margin:0 auto; }
+
+  .kpi-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:18px; }
+  .kpi-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden; }
+  .kpi-card .kpi-icon{ width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; margin-bottom:8px; }
+  .kpi-card .kpi-val{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; line-height:1; }
+  .kpi-card .kpi-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; margin-top:5px; font-weight:600; }
+
+  .rd-tabs{ display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--border); align-items:center; justify-content:space-between; }
+  .rd-tabs-left{ display:flex; gap:6px; }
+  .rd-tab{ padding:10px 16px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; gap:6px; }
+  .rd-tab.active{ color:var(--accent-ink); border-bottom-color:var(--accent); }
+
+  .rd-filters{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:16px; }
+  .rd-filters-head{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+  .rd-filters-head h3{ font-family:'Oswald',sans-serif; font-size:14px; margin:0; display:flex; align-items:center; gap:7px; text-transform:uppercase; letter-spacing:0.03em; }
+  .rd-filters-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:14px; }
+  .rd-field label{ font-size:10.5px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; display:block; margin-bottom:4px; }
+  .rd-field select, .rd-field input{ width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--surface); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; }
+  .rd-field select:focus, .rd-field input:focus{ outline:2px solid var(--steel); outline-offset:1px; }
+  .rd-search{ position:relative; }
+  .rd-search .material-icons{ position:absolute; left:8px; top:8px; color:var(--ink-faint); font-size:16px; }
+  .rd-search input{ padding-left:30px; }
+  .rd-toggle-row{ display:flex; align-items:center; gap:14px; margin-top:12px; flex-wrap:wrap; }
+  .rd-switch{ display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
+  .rd-switch input{ accent-color:var(--accent); width:15px; height:15px; }
+
+  .rd-addfilter{ display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); }
+  .rd-addfilter .rd-field{ min-width:150px; flex:1; }
+  .rd-addfilter .rd-field.narrow{ min-width:110px; flex:0 0 110px; }
+  .filter-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip{ display:flex; align-items:center; gap:6px; background:var(--steel-soft); color:var(--steel); border-radius:20px; padding:5px 6px 5px 12px; font-size:12px; font-weight:600; }
+  .chip .material-icons{ font-size:15px; cursor:pointer; background:rgba(255,255,255,0.5); border-radius:50%; padding:2px; }
+
+  .rd-toolbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px; }
+  .rd-count{ font-size:13px; color:var(--ink-soft); }
+  .rd-count b{ color:var(--ink); font-family:'IBM Plex Mono',monospace; }
+  .rd-toolbar-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .pagesize-select{ padding:7px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; font-family:'IBM Plex Sans',sans-serif; }
+
+  .rd-table-wrap{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:auto; max-height:640px; }
+  table.rd-table{ border-collapse:collapse; width:100%; font-size:12px; }
+  table.rd-table thead th{ position:sticky; top:0; background:#232A36; color:#EAEDF0; text-align:left; padding:9px 10px; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:0.03em; white-space:nowrap; z-index:3; }
+  table.rd-table tbody td{ padding:8px 10px; border-bottom:1px solid var(--border-soft); white-space:nowrap; font-family:'IBM Plex Mono',monospace; }
+  table.rd-table tbody td.txt{ font-family:'IBM Plex Sans',sans-serif; }
+  table.rd-table tbody tr:hover{ background:var(--surface-2); }
+  table.rd-table tbody tr.selected{ background:#FDEFE8; }
+  th.sticky-col, td.sticky-col{ position:sticky; left:0; z-index:2; background:var(--surface); }
+  tr.selected td.sticky-col{ background:#FDEFE8; }
+  th.sticky-col{ background:#232A36; z-index:4; }
+  th.sticky-col2, td.sticky-col2{ position:sticky; left:42px; z-index:2; background:var(--surface); box-shadow: 2px 0 4px rgba(0,0,0,0.06); }
+  tr.selected td.sticky-col2{ background:#FDEFE8; }
+  th.sticky-col2{ background:#232A36; z-index:4; }
+  .status-pill{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:10.5px; font-weight:700; font-family:'IBM Plex Sans',sans-serif; text-transform:uppercase; letter-spacing:0.02em; }
+  .st-pack{ background:var(--success-soft); color:var(--success); }
+  .st-cutting{ background:var(--warning-soft); color:var(--warning); }
+  .st-balance{ background:var(--steel-soft); color:var(--steel); }
+  .st-none{ background:#F0F1F3; color:var(--ink-faint); }
+  .st-other{ background:#F0F1F3; color:var(--ink-soft); }
+  .rd-chk{ width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
+  .aged-flag{ color:var(--danger); font-weight:700; }
+
+  .rd-pagination{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
+  .rd-page-btn{ padding:6px 12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); font-size:12.5px; cursor:pointer; font-family:'IBM Plex Mono',monospace; }
+  .rd-page-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+
+  .fab-cart{ position:fixed; bottom:24px; right:24px; z-index:40; background:var(--accent); color:#fff; border:none; border-radius:50px; padding:14px 20px; display:flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 8px 24px rgba(214,84,31,0.4); font-weight:700; font-size:14px; transition:transform .15s ease; }
+  .fab-cart:hover{ transform:translateY(-2px); }
+  .fab-badge{ background:#fff; color:var(--accent-ink); border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:11.5px; font-family:'IBM Plex Mono',monospace; }
+
+  .rd-overlay{ position:fixed; inset:0; background:rgba(20,24,30,0.5); z-index:50; }
+  .rd-drawer{ position:fixed; top:0; right:0; bottom:0; width:420px; max-width:100vw; background:var(--surface); z-index:51; display:flex; flex-direction:column; box-shadow:-8px 0 30px rgba(0,0,0,0.25); animation:slideIn .22s ease; }
+  @keyframes slideIn{ from{ transform:translateX(100%);} to{ transform:translateX(0);} }
+  .rd-drawer-head{ padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:#232A36; color:#fff; }
+  .rd-drawer-head h3{ font-family:'Oswald',sans-serif; margin:0; font-size:16px; text-transform:uppercase; letter-spacing:0.03em; display:flex; gap:8px; align-items:center; }
+  .rd-drawer-body{ padding:16px 18px; overflow-y:auto; flex:1; }
+  .cart-item{ border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+  .cart-item-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .cart-item-name{ font-size:12.5px; font-weight:600; }
+  .cart-item-sub{ font-size:11px; color:var(--ink-soft); margin-top:2px; font-family:'IBM Plex Mono',monospace; }
+  .cart-qty-row{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+  .cart-qty-row input{ width:100px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:13px; }
+  .cart-qty-row span{ font-size:11.5px; color:var(--ink-faint); }
+  .rd-form-field{ margin-bottom:12px; }
+  .rd-form-field label{ font-size:11px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; display:block; margin-bottom:4px; }
+  .rd-form-field input, .rd-form-field textarea{ width:100%; padding:9px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:'IBM Plex Sans',sans-serif; }
+  .rd-drawer-foot{ padding:14px 18px; border-top:1px solid var(--border); background:var(--surface-2); }
+  .rd-total-row{ display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:10px; }
+  .rd-total-row b{ font-family:'IBM Plex Mono',monospace; color:var(--accent-ink); }
+  .rd-empty-cart{ text-align:center; padding:40px 10px; color:var(--ink-faint); font-size:13px; }
+
+  .booking-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
+  .booking-card-head{ padding:12px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:var(--surface-2); }
+  .booking-id{ font-family:'IBM Plex Mono',monospace; font-weight:700; color:var(--accent-ink); font-size:13px; }
+  .booking-meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .booking-items{ padding:0 16px 14px; }
+  .booking-item-row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border-soft); font-size:12.5px; }
+  .booking-item-row:last-child{ border-bottom:none; }
+
+  .toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#232A36; color:#fff; padding:11px 20px; border-radius:8px; font-size:13px; z-index:60; display:flex; align-items:center; gap:8px; box-shadow:0 6px 20px rgba(0,0,0,0.25); max-width:90vw; text-align:center; }
+
+  @media (max-width: 980px){
+    .kpi-grid{ grid-template-columns:repeat(3,1fr); }
+    .rd-filters-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width: 640px){
+    .kpi-grid{ grid-template-columns:repeat(2,1fr); }
+    .rd-filters-grid{ grid-template-columns:1fr; }
+    .rd-body{ padding:14px; }
+    .rd-drawer{ width:100vw; }
+    .rd-header{ padding:16px; }
+    .rd-title h1{ font-size:17px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useCallback, useRef } = React;
+
+function Icon({ name, size, color, style }) {
+  return React.createElement("span", { className: "material-icons", style: { fontSize: size || 16, color: color || "inherit", ...style } }, name);
+}
+
+/* ---------------- helpers ---------------- */
+const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const fmt = (v, d) => num(v).toLocaleString("en-IN", { minimumFractionDigits: d===undefined?2:d, maximumFractionDigits: d===undefined?2:d });
+const fmtInt = (v) => Math.round(num(v)).toLocaleString("en-IN");
+
+function excelSerialToDate(n){ return new Date(Math.round((n - 25569) * 86400 * 1000)); }
+function fmtDate(v){
+  if (v === null || v === undefined || v === "") return "\u2014";
+  let d = null;
+  if (v instanceof Date) d = v;
+  else if (typeof v === "number") d = excelSerialToDate(v);
+  else { const p = new Date(v); if (!isNaN(p.getTime())) d = p; }
+  if (!d || isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+function dateSortValue(v){
+  if (v === null || v === undefined || v === "") return 0;
+  let d = null;
+  if (v instanceof Date) d = v;
+  else if (typeof v === "number") d = excelSerialToDate(v);
+  else { const p = new Date(v); if (!isNaN(p.getTime())) d = p; }
+  return d && !isNaN(d.getTime()) ? d.getTime() : 0;
+}
+function statusOf(shapeRaw){
+  const s = (shapeRaw || "").toString().trim().toUpperCase();
+  if (s.includes("PACK")) return { label: "Pack Ready", cls: "st-pack" };
+  if (s.includes("CUTTING")) return { label: "In Cutting", cls: "st-cutting" };
+  if (s.includes("BALANCE")) return { label: "Balance Left", cls: "st-balance" };
+  if (!s) return { label: "\u2014", cls: "st-none" };
+  return { label: shapeRaw, cls: "st-other" };
+}
+function pick(row, keys){
+  for (const k of keys) { if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k]; }
+  return "";
+}
+
+/* ---------------- canonical column map (covers Sheet1 + RIU JOB) ---------------- */
+const COLUMNS = [
+  { key:"company", label:"Company", keys:["COMPANY NAME","firm"], type:"text" },
+  { key:"sno", label:"S.No", keys:["S.NO"], type:"number" },
+  { key:"date", label:"Date", keys:["DATE"], type:"date" },
+  { key:"grade", label:"Grade", keys:["GRADE"], type:"text" },
+  { key:"make", label:"Make", keys:["Make"], type:"text" },
+  { key:"coilNo", label:"Coil No", keys:["Coil No."], type:"text" },
+  { key:"cPercent", label:"C%", keys:["C%"], type:"number" },
+  { key:"ys", label:"YS", keys:["YS"], type:"number" },
+  { key:"uts", label:"UTS", keys:["UTS"], type:"number" },
+  { key:"cutter", label:"Cutter", keys:["Name Of The Cutter"], type:"text" },
+  { key:"invoiceNo", label:"Invoice No", keys:["INVOICE NO"], type:"text" },
+  { key:"fromReceived", label:"From Received", keys:["FROM RECEIVED"], type:"text" },
+  { key:"yardCoilNo", label:"Yard Coil No", keys:["YARD COIL NO."], type:"text" },
+  { key:"challan", label:"Challan", keys:["Challan"], type:"text" },
+  { key:"specification", label:"Specification", keys:["Specification"], type:"text" },
+  { key:"thickness", label:"Thick (mm)", keys:["Thick In Mm"], type:"number" },
+  { key:"width", label:"Width (mm)", keys:["Width In Mm"], type:"number" },
+  { key:"hsn", label:"HSN Code", keys:["hsn code"], type:"text" },
+  { key:"length", label:"Length", keys:["LENGTH"], type:"number" },
+  { key:"rate", label:"Rate", keys:["Rate"], type:"number" },
+  { key:"qtyMT", label:"Qty (MT)", keys:["Qty. In M.T."], type:"number" },
+  { key:"balanceWeight", label:"Balance (MT)", keys:["Balance Weight"], type:"number" },
+  { key:"kantaWeight", label:"Kanta Weight", keys:["kanta weight","Kanta Weight"], type:"number" },
+  { key:"remarks", label:"Remarks", keys:["REMARKS"], type:"text" },
+  { key:"cw1", label:"Cut Wt 1", keys:["cutting weight1"], type:"number" },
+  { key:"cw2", label:"Cut Wt 2", keys:["cutting weight2"], type:"number" },
+  { key:"cw3", label:"Cut Wt 3", keys:["cutting weight3"], type:"number" },
+  { key:"cw4", label:"Cut Wt 4", keys:["cutting weight4"], type:"number" },
+  { key:"cw5", label:"Cut Wt 5", keys:["cutting weight5"], type:"number" },
+  { key:"totalCutWt", label:"Total Cut Wt", keys:["total cutting weight"], type:"number" },
+  { key:"actualBalShape", label:"Actual Bal Shape", keys:["actul balance coil shape"], type:"number" },
+  { key:"shape", label:"Shape/Status", keys:["SHAPE"], type:"text" },
+  { key:"receive", label:"Receive", keys:["RECIVE"], type:"text" },
+  { key:"block", label:"Block", keys:["BLOK"], type:"text" },
+  { key:"chq", label:"CHQ", keys:["CHQ"], type:"text" },
+  { key:"cuttingSize", label:"Cutting Size", keys:["CUTTING SIZE"], type:"text" },
+  { key:"balance2", label:"Balance", keys:["BALANCE"], type:"text" },
+  { key:"aCol", label:"A", keys:["A"], type:"number" },
+  { key:"a1Col", label:"A1", keys:["A1"], type:"number" },
+  { key:"bCol", label:"B", keys:["B"], type:"number" },
+  { key:"b2Col", label:"B2", keys:["B2"], type:"number" },
+  { key:"cCol", label:"C", keys:["C"], type:"number" },
+  { key:"c2Col", label:"C2", keys:["C2"], type:"number" },
+  { key:"dCol", label:"D", keys:["D"], type:"number" },
+  { key:"d2Col", label:"D2", keys:["D2"], type:"number" },
+  { key:"diff", label:"Diff", keys:["DIFF"], type:"number" },
+  { key:"ageing", label:"Ageing (d)", keys:["AGEING Days","DAYS"], type:"number" },
+  { key:"source", label:"Sheet", keys:[], type:"text" },
+];
+
+function normalizeRow(row, sheetName, idx){
+  const rec = { id: sheetName + "-" + idx };
+  COLUMNS.forEach(col => {
+    if (col.key === "source") return;
+    const raw = pick(row, col.keys);
+    rec[col.key] = col.type === "number" ? num(raw) : raw;
+  });
+  rec.source = sheetName;
+  return rec;
+}
+
+function BookingCard({ b, onExport }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="booking-card">
+      <div className="booking-card-head" onClick={() => setOpen(o => !o)}>
+        <div>
+          <span className="booking-id">{b.id}</span>
+          <div className="booking-meta">
+            {b.party} &middot; {b.date} &middot; {b.items.length} coil(s) &middot; {b.totalQty.toFixed(2)} MT
+            {b.vehicle ? " \u00b7 " + b.vehicle : ""}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); onExport(); }}>
+            <Icon name="download" size={14} /> Export
+          </button>
+          <Icon name={open ? "expand_less" : "expand_more"} size={20} />
+        </div>
+      </div>
+      {open && (
+        <div className="booking-items">
+          {b.items.map((it, i) => (
+            <div className="booking-item-row" key={i}>
+              <span>{it.grade} &middot; {it.make} &middot; Coil {it.coilNo} / Yard {it.yardCoilNo}</span>
+              <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>{it.qtyBooked.toFixed(2)} MT</span>
+            </div>
+          ))}
+          {b.remarks && <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-soft)" }}>Remarks: {b.remarks}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App(){
+  const [records, setRecords] = useState([]);
+  const [original, setOriginal] = useState([]);
+  const [fileName, setFileName] = useState("");
+  const [loadedSheets, setLoadedSheets] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const [activeTab, setActiveTab] = useState("stock");
+  const [showFilters, setShowFilters] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [fCompany, setFCompany] = useState("ALL");
+  const [fGrade, setFGrade] = useState("ALL");
+  const [fMake, setFMake] = useState("ALL");
+  const [fStatus, setFStatus] = useState("ALL");
+  const [fSource, setFSource] = useState("ALL");
+  const [onlyAvailable, setOnlyAvailable] = useState(true);
+  const [thickMin, setThickMin] = useState("");
+  const [thickMax, setThickMax] = useState("");
+
+  // generic any-column filters
+  const [filters, setFilters] = useState([]);
+  const [nfCol, setNfCol] = useState(COLUMNS[0].key);
+  const [nfText, setNfText] = useState("");
+  const [nfMin, setNfMin] = useState("");
+  const [nfMax, setNfMax] = useState("");
+  const [nfFrom, setNfFrom] = useState("");
+  const [nfTo, setNfTo] = useState("");
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [cartQty, setCartQty] = useState({});
+  const [cartOpen, setCartOpen] = useState(false);
+  const [bookings, setBookings] = useState([]);
+  const [toast, setToast] = useState("");
+
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(""), 3800); }, []);
+
+  const handleFile = useCallback((file) => {
+    if (!file) return;
+    setLoading(true); setError("");
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: "array", cellDates: true });
+        const targetSheets = wb.SheetNames.filter(n => wb.Sheets[n] && Object.keys(wb.Sheets[n]).length > 0);
+        let all = [];
+        targetSheets.forEach((sheetName) => {
+          const ws = wb.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: true });
+          json.forEach((row, idx) => {
+            const norm = normalizeRow(row, sheetName, idx);
+            if (norm.coilNo || norm.yardCoilNo || norm.company) all.push(norm);
+          });
+        });
+        if (all.length === 0) {
+          setError("Is file mein koi readable stock row nahi mili. Sheet format check karein.");
+          setLoading(false); return;
+        }
+        setRecords(all);
+        setOriginal(JSON.parse(JSON.stringify(all)));
+        setFileName(file.name);
+        setLoadedSheets(targetSheets);
+        setSelectedIds(new Set()); setCartQty({}); setBookings([]); setPage(1); setFilters([]);
+        setLoading(false);
+        showToast("Loaded " + all.length + " rows \u00b7 " + (COLUMNS.length - 1) + " columns from " + targetSheets.length + " sheet(s)");
+      } catch (err) {
+        setError("File padhne mein error aayi: " + err.message);
+        setLoading(false);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }, [showToast]);
+
+  const onDrop = useCallback((e) => { e.preventDefault(); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); }, [handleFile]);
+
+  const facets = useMemo(() => {
+    const companies = new Set(), grades = new Set(), makes = new Set();
+    records.forEach(r => { if (r.company) companies.add(r.company); if (r.grade) grades.add(r.grade); if (r.make) makes.add(r.make); });
+    return {
+      companies: ["ALL"].concat(Array.from(companies).sort()),
+      grades: ["ALL"].concat(Array.from(grades).sort()),
+      makes: ["ALL"].concat(Array.from(makes).sort()),
+    };
+  }, [records]);
+
+  const kpis = useMemo(() => {
+    let totalBalance = 0, available = 0, cutting = 0, pack = 0, aged = 0;
+    const companies = new Set();
+    records.forEach(r => {
+      if (r.company) companies.add(r.company);
+      if (r.balanceWeight > 0.005) {
+        totalBalance += r.balanceWeight; available += 1;
+        const s = statusOf(r.shape).cls;
+        if (s === "st-cutting") cutting += 1;
+        if (s === "st-pack") pack += 1;
+        if (r.ageing >= 365) aged += 1;
+      }
+    });
+    return { total: records.length, totalBalance, available, cutting, pack, companies: companies.size, aged };
+  }, [records]);
+
+  const nfColDef = COLUMNS.find(c => c.key === nfCol) || COLUMNS[0];
+  const distinctForNfCol = useMemo(() => {
+    const set = new Set();
+    records.forEach(r => { const v = r[nfCol]; if (v !== undefined && v !== null && v !== "") set.add(String(v)); });
+    return Array.from(set).sort();
+  }, [records, nfCol]);
+  const useSelectForNf = nfColDef.type === "text" && distinctForNfCol.length > 0 && distinctForNfCol.length <= 80;
+
+  const addFilter = () => {
+    const def = nfColDef;
+    let f = { id: Date.now() + Math.random(), key: nfCol, label: def.label, type: def.type };
+    if (def.type === "number") {
+      if (nfMin === "" && nfMax === "") return;
+      f.min = nfMin; f.max = nfMax;
+      f.display = (nfMin !== "" ? "\u2265" + nfMin : "") + " " + (nfMax !== "" ? "\u2264" + nfMax : "");
+    } else if (def.type === "date") {
+      if (!nfFrom && !nfTo) return;
+      f.from = nfFrom; f.to = nfTo;
+      f.display = (nfFrom || "...") + " \u2192 " + (nfTo || "...");
+    } else {
+      if (!nfText.trim()) return;
+      f.value = nfText.trim();
+      f.display = nfText.trim();
+    }
+    setFilters(prev => [...prev, f]);
+    setNfText(""); setNfMin(""); setNfMax(""); setNfFrom(""); setNfTo("");
+    setPage(1);
+  };
+  const removeFilter = (id) => { setFilters(prev => prev.filter(f => f.id !== id)); setPage(1); };
+
+  const matchesFilter = (r, f) => {
+    if (f.type === "number") {
+      const v = num(r[f.key]);
+      if (f.min !== "" && v < parseFloat(f.min)) return false;
+      if (f.max !== "" && v > parseFloat(f.max)) return false;
+      return true;
+    }
+    if (f.type === "date") {
+      const t = dateSortValue(r[f.key]);
+      if (f.from && t < new Date(f.from).getTime()) return false;
+      if (f.to && t > new Date(f.to).getTime() + 86399999) return false;
+      return true;
+    }
+    const val = (r[f.key] || "").toString().toLowerCase();
+    return val.includes(f.value.toLowerCase());
+  };
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return records.filter(r => {
+      if (onlyAvailable && r.balanceWeight <= 0.005) return false;
+      if (fCompany !== "ALL" && r.company !== fCompany) return false;
+      if (fGrade !== "ALL" && r.grade !== fGrade) return false;
+      if (fMake !== "ALL" && r.make !== fMake) return false;
+      if (fSource !== "ALL" && r.source !== fSource) return false;
+      if (fStatus !== "ALL" && statusOf(r.shape).cls !== fStatus) return false;
+      if (thickMin !== "" && r.thickness < parseFloat(thickMin)) return false;
+      if (thickMax !== "" && r.thickness > parseFloat(thickMax)) return false;
+      for (let i = 0; i < filters.length; i++) { if (!matchesFilter(r, filters[i])) return false; }
+      if (q) {
+        const hay = COLUMNS.map(c => r[c.key]).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    }).sort((a, b) => dateSortValue(b.date) - dateSortValue(a.date));
+  }, [records, search, fCompany, fGrade, fMake, fSource, fStatus, onlyAvailable, thickMin, thickMax, filters]);
+
+  const filteredTotal = useMemo(() => filtered.reduce((s, r) => s + r.balanceWeight, 0), [filtered]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const resetFilters = () => {
+    setSearch(""); setFCompany("ALL"); setFGrade("ALL"); setFMake("ALL");
+    setFStatus("ALL"); setFSource("ALL"); setOnlyAvailable(true);
+    setThickMin(""); setThickMax(""); setFilters([]); setPage(1);
+  };
+
+  const toggleSelect = (r) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(r.id)) {
+        next.delete(r.id);
+        setCartQty(c => { const nc = { ...c }; delete nc[r.id]; return nc; });
+      } else {
+        if (r.balanceWeight <= 0.005) return prev;
+        next.add(r.id);
+        setCartQty(c => ({ ...c, [r.id]: r.balanceWeight }));
+      }
+      return next;
+    });
+  };
+
+  const removeFromCart = (id) => {
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+    setCartQty(c => { const nc = { ...c }; delete nc[id]; return nc; });
+  };
+
+  const cartItems = useMemo(() => records.filter(r => selectedIds.has(r.id)), [records, selectedIds]);
+  const cartTotalQty = useMemo(() => cartItems.reduce((s, r) => s + num(cartQty[r.id]), 0), [cartItems, cartQty]);
+
+  const setQty = (id, val, max) => {
+    let v = parseFloat(val);
+    if (isNaN(v)) v = 0;
+    if (v < 0) v = 0;
+    if (v > max) v = max;
+    setCartQty(c => ({ ...c, [id]: v }));
+  };
+
+  const [bkParty, setBkParty] = useState("");
+  const [bkDate, setBkDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [bkVehicle, setBkVehicle] = useState("");
+  const [bkRemarks, setBkRemarks] = useState("");
+  const [bkError, setBkError] = useState("");
+
+  const saveBooking = () => {
+    if (!bkParty.trim()) { setBkError("Party ka naam daalein."); return; }
+    if (cartItems.length === 0) { setBkError("Kam se kam ek coil select karein."); return; }
+    const items = cartItems.map(r => ({
+      recordId: r.id, company: r.company, grade: r.grade, make: r.make,
+      coilNo: r.coilNo, yardCoilNo: r.yardCoilNo, thickness: r.thickness,
+      width: r.width, qtyBooked: num(cartQty[r.id]),
+    })).filter(it => it.qtyBooked > 0);
+    if (items.length === 0) { setBkError("Booking quantity 0 se zyada honi chahiye."); return; }
+
+    const bookingId = "BK-" + String(bookings.length + 1).padStart(3, "0");
+    const totalQty = items.reduce((s, it) => s + it.qtyBooked, 0);
+    setBookings(prev => [{ id: bookingId, party: bkParty.trim(), date: bkDate, vehicle: bkVehicle.trim(), remarks: bkRemarks.trim(), items, totalQty, createdAt: new Date() }, ...prev]);
+
+    setRecords(prev => prev.map(r => {
+      const it = items.find(i => i.recordId === r.id);
+      if (!it) return r;
+      return { ...r, balanceWeight: Math.max(0, r.balanceWeight - it.qtyBooked) };
+    }));
+
+    setSelectedIds(new Set()); setCartQty({});
+    const savedParty = bkParty.trim();
+    setBkParty(""); setBkVehicle(""); setBkRemarks(""); setBkError("");
+    setCartOpen(false);
+    showToast(bookingId + " saved for " + savedParty + " \u2014 " + fmt(totalQty) + " MT. Agli booking ke liye aur coils select karein.");
+  };
+
+  const resetSession = () => {
+    if (!window.confirm("Sabhi bookings clear ho jayengi aur stock original balance par reset ho jayega. Continue?")) return;
+    setRecords(JSON.parse(JSON.stringify(original)));
+    setBookings([]); setSelectedIds(new Set()); setCartQty({});
+    showToast("Session reset ho gaya.");
+  };
+
+  const exportRows = (rows, filename) => {
+    const data = rows.map(r => {
+      const o = {};
+      COLUMNS.forEach(c => {
+        if (c.key === "date") o[c.label] = fmtDate(r.date);
+        else if (c.key === "shape") o[c.label] = statusOf(r.shape).label;
+        else if (c.type === "number") o[c.label] = Number(num(r[c.key]).toFixed(3));
+        else o[c.label] = r[c.key];
+      });
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Stock");
+    XLSX.writeFile(wb, filename);
+  };
+
+  const exportBooking = (b) => {
+    const data = b.items.map(it => ({
+      "Booking ID": b.id, Party: b.party, "Booking Date": b.date, Vehicle: b.vehicle,
+      Company: it.company, Grade: it.grade, Make: it.make, "Coil No": it.coilNo,
+      "Yard Coil No": it.yardCoilNo, "Thick (mm)": it.thickness, "Width (mm)": it.width,
+      "Qty Booked (MT)": it.qtyBooked, Remarks: b.remarks,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, b.id);
+    XLSX.writeFile(wb, b.id + "_" + b.party.replace(/\s+/g, "_") + ".xlsx");
+  };
+
+  const exportAllBookings = () => {
+    const data = [];
+    bookings.forEach(b => {
+      b.items.forEach(it => {
+        data.push({
+          "Booking ID": b.id, Party: b.party, "Booking Date": b.date, Vehicle: b.vehicle,
+          Company: it.company, Grade: it.grade, Make: it.make, "Coil No": it.coilNo,
+          "Yard Coil No": it.yardCoilNo, "Thick (mm)": it.thickness, "Width (mm)": it.width,
+          "Qty Booked (MT)": it.qtyBooked, Remarks: b.remarks,
+        });
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "All Bookings");
+    XLSX.writeFile(wb, "RIU_All_Bookings.xlsx");
+  };
+
+  const displayCols = COLUMNS;
+
+  return (
+    <div>
+      <div className="rd-header">
+        <div className="rd-header-row">
+          <div className="rd-title">
+            <div className="rd-badge"><Icon name="layers" size={22} color="#fff" /></div>
+            <div>
+              <h1 className="disp">RIU Coil Live Dashboard</h1>
+              <p>Rajasthan Ispat Udyog &mdash; Coil Stock &amp; Booking, Jaipur</p>
+            </div>
+          </div>
+          <div className="rd-actions">
+            {records.length > 0 && (
+              <React.Fragment>
+                <span style={{ fontSize: 12, color: "#AEB6C2" }}>
+                  <Icon name="description" size={14} style={{ marginRight: 4 }} />
+                  {fileName} &middot; {loadedSheets.join(", ")}
+                </span>
+                <button className="btn btn-ghost btn-sm" onClick={resetSession}>
+                  <Icon name="restart_alt" size={15} /> Reset Session
+                </button>
+              </React.Fragment>
+            )}
+            <button className="btn btn-accent" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+              <Icon name="upload_file" size={16} /> {records.length > 0 ? "Change File" : "Upload Excel"}
+            </button>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: "none" }}
+              onChange={(e) => handleFile(e.target.files && e.target.files[0])} />
+          </div>
+        </div>
+      </div>
+      <div className="rd-hazard" />
+
+      <div className="rd-body">
+        {records.length === 0 ? (
+          <div className="rd-empty" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+            <Icon name="speed" size={36} color="#D6541F" />
+            <h2 className="disp">Upload your stock register to go live</h2>
+            <p>
+              CUTTER_2026-27.xlsm jaisi file upload karein &mdash; Sheet1 aur RIU JOB dono
+              sheets, sabhi 46 columns automatically padh li jayengi. Sab kuch is browser
+              ke andar chalta hai, koi server par upload nahi hota.
+            </p>
+            <div className="rd-drop" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+              <Icon name="upload_file" size={26} color="#2F6690" style={{ marginBottom: 8, display: "block" }} />
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2F6690" }}>
+                {loading ? "Reading file..." : "Click or drag your .xlsx / .xlsm file here"}
+              </div>
+            </div>
+            {error && (
+              <div style={{ marginTop: 14, color: "var(--danger)", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                <Icon name="warning" size={16} /> {error}
+              </div>
+            )}
+          </div>
+        ) : (
+          <React.Fragment>
+            <div className="rd-tabs">
+              <div className="rd-tabs-left">
+                <div className={"rd-tab" + (activeTab === "stock" ? " active" : "")} onClick={() => setActiveTab("stock")}>
+                  <Icon name="inventory_2" size={16} /> Stock Dashboard
+                </div>
+                <div className={"rd-tab" + (activeTab === "bookings" ? " active" : "")} onClick={() => setActiveTab("bookings")}>
+                  <Icon name="assignment" size={16} /> Bookings {bookings.length > 0 ? "(" + bookings.length + ")" : ""}
+                </div>
+              </div>
+            </div>
+
+            {activeTab === "stock" && (
+              <React.Fragment>
+                <div className="kpi-grid">
+                  <div className="kpi-card">
+                    <div className="kpi-icon" style={{ background: "var(--steel-soft)" }}><Icon name="layers" size={16} color="var(--steel)" /></div>
+                    <div className="kpi-val">{fmtInt(kpis.total)}</div>
+                    <div className="kpi-label">Total Records</div>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="kpi-icon" style={{ background: "var(--success-soft)" }}><Icon name="trending_up" size={16} color="var(--success)" /></div>
+                    <div className="kpi-val">{fmt(kpis.totalBalance, 1)}</div>
+                    <div className="kpi-label">Live Stock (MT)</div>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="kpi-icon" style={{ background: "#FDEFE8" }}><Icon name="check_circle" size={16} color="var(--accent)" /></div>
+                    <div className="kpi-val">{fmtInt(kpis.available)}</div>
+                    <div className="kpi-label">Available Coils</div>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="kpi-icon" style={{ background: "var(--warning-soft)" }}><Icon name="content_cut" size={16} color="var(--warning)" /></div>
+                    <div className="kpi-val">{fmtInt(kpis.cutting)}</div>
+                    <div className="kpi-label">In Cutting</div>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="kpi-icon" style={{ background: "var(--success-soft)" }}><Icon name="inventory_2" size={16} color="var(--success)" /></div>
+                    <div className="kpi-val">{fmtInt(kpis.pack)}</div>
+                    <div className="kpi-label">Pack Ready</div>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="kpi-icon" style={{ background: "var(--danger-soft)" }}><Icon name="apartment" size={16} color="var(--danger)" /></div>
+                    <div className="kpi-val">{fmtInt(kpis.companies)}</div>
+                    <div className="kpi-label">Companies</div>
+                  </div>
+                </div>
+
+                <div className="rd-filters">
+                  <div className="rd-filters-head" onClick={() => setShowFilters(s => !s)}>
+                    <h3 className="disp"><Icon name="tune" size={16} /> Filters {filters.length > 0 ? "(" + filters.length + " active)" : ""}</h3>
+                    <Icon name={showFilters ? "expand_less" : "expand_more"} size={20} />
+                  </div>
+                  {showFilters && (
+                    <React.Fragment>
+                      <div className="rd-filters-grid">
+                        <div className="rd-field rd-search">
+                          <label>Search (sabhi columns mein)</label>
+                          <Icon name="search" size={16} />
+                          <input placeholder="Kuch bhi type karein..." value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+                        </div>
+                        <div className="rd-field">
+                          <label>Company</label>
+                          <select value={fCompany} onChange={(e) => { setFCompany(e.target.value); setPage(1); }}>
+                            {facets.companies.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div className="rd-field">
+                          <label>Grade</label>
+                          <select value={fGrade} onChange={(e) => { setFGrade(e.target.value); setPage(1); }}>
+                            {facets.grades.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div className="rd-field">
+                          <label>Make</label>
+                          <select value={fMake} onChange={(e) => { setFMake(e.target.value); setPage(1); }}>
+                            {facets.makes.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div className="rd-field">
+                          <label>Status</label>
+                          <select value={fStatus} onChange={(e) => { setFStatus(e.target.value); setPage(1); }}>
+                            <option value="ALL">All Status</option>
+                            <option value="st-pack">Pack Ready</option>
+                            <option value="st-cutting">In Cutting</option>
+                            <option value="st-balance">Balance Left</option>
+                            <option value="st-other">Other</option>
+                          </select>
+                        </div>
+                        <div className="rd-field">
+                          <label>Sheet Source</label>
+                          <select value={fSource} onChange={(e) => { setFSource(e.target.value); setPage(1); }}>
+                            <option value="ALL">All Sheets</option>
+                            {loadedSheets.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="rd-filters-grid" style={{ marginTop: 10 }}>
+                        <div className="rd-field">
+                          <label>Thickness Min (mm)</label>
+                          <input type="number" value={thickMin} onChange={(e) => { setThickMin(e.target.value); setPage(1); }} placeholder="0" />
+                        </div>
+                        <div className="rd-field">
+                          <label>Thickness Max (mm)</label>
+                          <input type="number" value={thickMax} onChange={(e) => { setThickMax(e.target.value); setPage(1); }} placeholder="any" />
+                        </div>
+                      </div>
+                      <div className="rd-toggle-row">
+                        <label className="rd-switch">
+                          <input type="checkbox" checked={onlyAvailable}
+                            onChange={(e) => { setOnlyAvailable(e.target.checked); setPage(1); }} />
+                          Show only available stock (balance &gt; 0)
+                        </label>
+                        <button className="btn btn-outline btn-sm" onClick={resetFilters}>
+                          <Icon name="restart_alt" size={14} /> Clear All Filters
+                        </button>
+                      </div>
+
+                      {/* Generic any-column filter builder */}
+                      <div className="rd-addfilter">
+                        <div className="rd-field narrow" style={{ flex: "0 0 190px" }}>
+                          <label>Filter by any column</label>
+                          <select value={nfCol} onChange={(e) => { setNfCol(e.target.value); setNfText(""); setNfMin(""); setNfMax(""); setNfFrom(""); setNfTo(""); }}>
+                            {COLUMNS.filter(c => c.key !== "source").map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                          </select>
+                        </div>
+                        {nfColDef.type === "number" && (
+                          <React.Fragment>
+                            <div className="rd-field narrow">
+                              <label>Min</label>
+                              <input type="number" value={nfMin} onChange={(e) => setNfMin(e.target.value)} placeholder="e.g. 10" />
+                            </div>
+                            <div className="rd-field narrow">
+                              <label>Max</label>
+                              <input type="number" value={nfMax} onChange={(e) => setNfMax(e.target.value)} placeholder="e.g. 1500" />
+                            </div>
+                          </React.Fragment>
+                        )}
+                        {nfColDef.type === "date" && (
+                          <React.Fragment>
+                            <div className="rd-field narrow">
+                              <label>From</label>
+                              <input type="date" value={nfFrom} onChange={(e) => setNfFrom(e.target.value)} />
+                            </div>
+                            <div className="rd-field narrow">
+                              <label>To</label>
+                              <input type="date" value={nfTo} onChange={(e) => setNfTo(e.target.value)} />
+                            </div>
+                          </React.Fragment>
+                        )}
+                        {nfColDef.type === "text" && (
+                          <div className="rd-field">
+                            <label>Value</label>
+                            {useSelectForNf ? (
+                              <select value={nfText} onChange={(e) => setNfText(e.target.value)}>
+                                <option value="">Select...</option>
+                                {distinctForNfCol.map(v => <option key={v} value={v}>{v}</option>)}
+                              </select>
+                            ) : (
+                              <input value={nfText} onChange={(e) => setNfText(e.target.value)} placeholder="Contains text..." />
+                            )}
+                          </div>
+                        )}
+                        <button className="btn btn-steel btn-sm" onClick={addFilter}>
+                          <Icon name="add" size={15} /> Add Filter
+                        </button>
+                      </div>
+                      {filters.length > 0 && (
+                        <div className="filter-chips">
+                          {filters.map(f => (
+                            <div className="chip" key={f.id}>
+                              {f.label}: {f.display}
+                              <Icon name="close" size={15} onClick={() => removeFilter(f.id)} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  )}
+                </div>
+
+                <div className="rd-toolbar">
+                  <div className="rd-count">
+                    Showing <b>{pageRows.length}</b> of <b>{filtered.length}</b> records (total {fmtInt(records.length)} loaded) &middot; Filtered balance: <b>{fmt(filteredTotal, 2)} MT</b>
+                  </div>
+                  <div className="rd-toolbar-right">
+                    <select className="pagesize-select" value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}>
+                      <option value={25}>25 / page</option>
+                      <option value={50}>50 / page</option>
+                      <option value={100}>100 / page</option>
+                      <option value={250}>250 / page</option>
+                      <option value={5000}>Show All</option>
+                    </select>
+                    <button className="btn btn-outline btn-sm" onClick={() => exportRows(filtered, "RIU_Filtered_Stock.xlsx")}>
+                      <Icon name="download" size={14} /> Export Filtered ({filtered.length})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rd-table-wrap">
+                  <table className="rd-table">
+                    <thead>
+                      <tr>
+                        <th className="sticky-col"></th>
+                        <th className="sticky-col2">Company</th>
+                        {displayCols.filter(c => c.key !== "company").map(c => <th key={c.key}>{c.label}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageRows.map(r => {
+                        const isSel = selectedIds.has(r.id);
+                        const bookable = r.balanceWeight > 0.005;
+                        return (
+                          <tr key={r.id} className={isSel ? "selected" : ""}>
+                            <td className="sticky-col">
+                              <input type="checkbox" className="rd-chk" checked={isSel} disabled={!bookable} onChange={() => toggleSelect(r)} />
+                            </td>
+                            <td className="sticky-col2 txt">{r.company}</td>
+                            {displayCols.filter(c => c.key !== "company").map(c => {
+                              let val;
+                              if (c.key === "date") val = fmtDate(r.date);
+                              else if (c.key === "shape") { const st = statusOf(r.shape); val = <span className={"status-pill " + st.cls}>{st.label}</span>; }
+                              else if (c.key === "ageing") val = <span className={r.ageing >= 365 ? "aged-flag" : ""}>{fmtInt(r.ageing)}</span>;
+                              else if (c.type === "number") val = fmt(r[c.key], c.key === "sno" ? 0 : 2);
+                              else val = r[c.key] || "\u2014";
+                              return <td key={c.key} className={c.type === "text" ? "txt" : ""}>{val}</td>;
+                            })}
+                          </tr>
+                        );
+                      })}
+                      {pageRows.length === 0 && (
+                        <tr><td colSpan={displayCols.length + 1} style={{ textAlign: "center", padding: 30, color: "var(--ink-faint)" }}>
+                          Koi record match nahi hua. Filters adjust karein.
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="rd-pagination">
+                  <button className="rd-page-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>&larr; Prev</button>
+                  <span style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Page {page} of {totalPages}</span>
+                  <button className="rd-page-btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next &rarr;</button>
+                </div>
+              </React.Fragment>
+            )}
+
+            {activeTab === "bookings" && (
+              <div>
+                <div className="rd-toolbar">
+                  <div className="rd-count">
+                    <b>{bookings.length}</b> booking(s) this session &middot; Total booked: <b>{fmt(bookings.reduce((s, b) => s + b.totalQty, 0), 2)} MT</b>
+                  </div>
+                  {bookings.length > 0 && (
+                    <button className="btn btn-outline btn-sm" onClick={exportAllBookings}>
+                      <Icon name="download" size={14} /> Export All Bookings
+                    </button>
+                  )}
+                </div>
+                {bookings.length === 0 ? (
+                  <div className="rd-empty" style={{ margin: "30px auto" }}>
+                    <Icon name="assignment" size={30} color="var(--ink-faint)" />
+                    <h2 className="disp" style={{ fontSize: 17 }}>No bookings yet</h2>
+                    <p>Stock Dashboard tab se coils select karein aur booking cart se save karein. Ek baar save karne ke baad turant agli booking ke liye naye coils select kar sakte hain.</p>
+                    <button className="btn btn-accent" onClick={() => setActiveTab("stock")}>
+                      Go to Stock Dashboard <Icon name="arrow_forward" size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  bookings.map(b => <BookingCard key={b.id} b={b} onExport={() => exportBooking(b)} />)
+                )}
+              </div>
+            )}
+          </React.Fragment>
+        )}
+      </div>
+
+      {records.length > 0 && selectedIds.size > 0 && !cartOpen && (
+        <button className="fab-cart" onClick={() => setCartOpen(true)}>
+          <Icon name="shopping_cart" size={18} color="#fff" />
+          Booking Cart
+          <span className="fab-badge">{selectedIds.size}</span>
+        </button>
+      )}
+
+      {cartOpen && (
+        <React.Fragment>
+          <div className="rd-overlay" onClick={() => setCartOpen(false)} />
+          <div className="rd-drawer">
+            <div className="rd-drawer-head">
+              <h3><Icon name="shopping_cart" size={18} /> New Booking</h3>
+              <Icon name="close" size={20} style={{ cursor: "pointer" }} onClick={() => setCartOpen(false)} />
+            </div>
+            <div className="rd-drawer-body">
+              {cartItems.length === 0 ? (
+                <div className="rd-empty-cart">Cart khaali hai. Table se coils select karein.</div>
+              ) : (
+                cartItems.map(r => (
+                  <div className="cart-item" key={r.id}>
+                    <div className="cart-item-top">
+                      <div>
+                        <div className="cart-item-name">{r.grade || r.specification} &middot; {r.make}</div>
+                        <div className="cart-item-sub">Coil {r.coilNo} / Yard {r.yardCoilNo}</div>
+                      </div>
+                      <Icon name="delete" size={17} color="var(--danger)" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => removeFromCart(r.id)} />
+                    </div>
+                    <div className="cart-qty-row">
+                      <input type="number" step="0.01" min="0" max={r.balanceWeight}
+                        value={cartQty[r.id] !== undefined ? cartQty[r.id] : r.balanceWeight}
+                        onChange={(e) => setQty(r.id, e.target.value, r.balanceWeight)} />
+                      <span>MT of {fmt(r.balanceWeight, 2)} MT available</span>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <div className="rd-form-field">
+                  <label><Icon name="apartment" size={13} /> Party Name *</label>
+                  <input value={bkParty} onChange={(e) => setBkParty(e.target.value)} placeholder="e.g. S.K Agarwal & Co" />
+                </div>
+                <div className="rd-form-field">
+                  <label><Icon name="event" size={13} /> Booking Date</label>
+                  <input type="date" value={bkDate} onChange={(e) => setBkDate(e.target.value)} />
+                </div>
+                <div className="rd-form-field">
+                  <label><Icon name="local_shipping" size={13} /> Vehicle No (optional)</label>
+                  <input value={bkVehicle} onChange={(e) => setBkVehicle(e.target.value)} placeholder="RJ14 ..." />
+                </div>
+                <div className="rd-form-field">
+                  <label>Remarks</label>
+                  <textarea rows={2} value={bkRemarks} onChange={(e) => setBkRemarks(e.target.value)} placeholder="Optional note" />
+                </div>
+                {bkError && <div style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{bkError}</div>}
+              </div>
+            </div>
+            <div className="rd-drawer-foot">
+              <div className="rd-total-row">
+                <span>Total Booking Qty</span>
+                <b>{fmt(cartTotalQty, 2)} MT</b>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} onClick={() => setCartOpen(false)}>Cancel</button>
+                <button className="btn btn-accent" style={{ flex: 2, justifyContent: "center" }} onClick={saveBooking}>
+                  <Icon name="check_circle" size={16} /> Save Booking
+                </button>
+              </div>
+            </div>
+          </div>
+        </React.Fragment>
+      )}
+
+      {toast && <div className="toast"><Icon name="check_circle" size={16} /> {toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
