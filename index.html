@@ -9,7 +9,6 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -178,103 +177,342 @@
 <body>
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react">
-const { useState, useMemo, useCallback, useRef } = React;
-
-function Icon({ name, size, color, style }) {
-  return React.createElement("span", { className: "material-icons", style: { fontSize: size || 16, color: color || "inherit", ...style } }, name);
+<script>
+import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
+const {
+  useState,
+  useMemo,
+  useCallback,
+  useRef
+} = React;
+function Icon({
+  name,
+  size,
+  color,
+  style
+}) {
+  return React.createElement("span", {
+    className: "material-icons",
+    style: {
+      fontSize: size || 16,
+      color: color || "inherit",
+      ...style
+    }
+  }, name);
 }
 
 /* ---------------- helpers ---------------- */
-const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-const fmt = (v, d) => num(v).toLocaleString("en-IN", { minimumFractionDigits: d===undefined?2:d, maximumFractionDigits: d===undefined?2:d });
-const fmtInt = (v) => Math.round(num(v)).toLocaleString("en-IN");
-
-function excelSerialToDate(n){ return new Date(Math.round((n - 25569) * 86400 * 1000)); }
-function fmtDate(v){
+const num = v => {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+};
+const fmt = (v, d) => num(v).toLocaleString("en-IN", {
+  minimumFractionDigits: d === undefined ? 2 : d,
+  maximumFractionDigits: d === undefined ? 2 : d
+});
+const fmtInt = v => Math.round(num(v)).toLocaleString("en-IN");
+function excelSerialToDate(n) {
+  return new Date(Math.round((n - 25569) * 86400 * 1000));
+}
+function fmtDate(v) {
   if (v === null || v === undefined || v === "") return "\u2014";
   let d = null;
-  if (v instanceof Date) d = v;
-  else if (typeof v === "number") d = excelSerialToDate(v);
-  else { const p = new Date(v); if (!isNaN(p.getTime())) d = p; }
+  if (v instanceof Date) d = v;else if (typeof v === "number") d = excelSerialToDate(v);else {
+    const p = new Date(v);
+    if (!isNaN(p.getTime())) d = p;
+  }
   if (!d || isNaN(d.getTime())) return String(v);
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
 }
-function dateSortValue(v){
+function dateSortValue(v) {
   if (v === null || v === undefined || v === "") return 0;
   let d = null;
-  if (v instanceof Date) d = v;
-  else if (typeof v === "number") d = excelSerialToDate(v);
-  else { const p = new Date(v); if (!isNaN(p.getTime())) d = p; }
+  if (v instanceof Date) d = v;else if (typeof v === "number") d = excelSerialToDate(v);else {
+    const p = new Date(v);
+    if (!isNaN(p.getTime())) d = p;
+  }
   return d && !isNaN(d.getTime()) ? d.getTime() : 0;
 }
-function statusOf(shapeRaw){
+function statusOf(shapeRaw) {
   const s = (shapeRaw || "").toString().trim().toUpperCase();
-  if (s.includes("PACK")) return { label: "Pack Ready", cls: "st-pack" };
-  if (s.includes("CUTTING")) return { label: "In Cutting", cls: "st-cutting" };
-  if (s.includes("BALANCE")) return { label: "Balance Left", cls: "st-balance" };
-  if (!s) return { label: "\u2014", cls: "st-none" };
-  return { label: shapeRaw, cls: "st-other" };
+  if (s.includes("PACK")) return {
+    label: "Pack Ready",
+    cls: "st-pack"
+  };
+  if (s.includes("CUTTING")) return {
+    label: "In Cutting",
+    cls: "st-cutting"
+  };
+  if (s.includes("BALANCE")) return {
+    label: "Balance Left",
+    cls: "st-balance"
+  };
+  if (!s) return {
+    label: "\u2014",
+    cls: "st-none"
+  };
+  return {
+    label: shapeRaw,
+    cls: "st-other"
+  };
 }
-function pick(row, keys){
-  for (const k of keys) { if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k]; }
+function pick(row, keys) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+  }
   return "";
 }
 
 /* ---------------- canonical column map (covers Sheet1 + RIU JOB) ---------------- */
-const COLUMNS = [
-  { key:"company", label:"Company", keys:["COMPANY NAME","firm"], type:"text" },
-  { key:"sno", label:"S.No", keys:["S.NO"], type:"number" },
-  { key:"date", label:"Date", keys:["DATE"], type:"date" },
-  { key:"grade", label:"Grade", keys:["GRADE"], type:"text" },
-  { key:"make", label:"Make", keys:["Make"], type:"text" },
-  { key:"coilNo", label:"Coil No", keys:["Coil No."], type:"text" },
-  { key:"cPercent", label:"C%", keys:["C%"], type:"number" },
-  { key:"ys", label:"YS", keys:["YS"], type:"number" },
-  { key:"uts", label:"UTS", keys:["UTS"], type:"number" },
-  { key:"cutter", label:"Cutter", keys:["Name Of The Cutter"], type:"text" },
-  { key:"invoiceNo", label:"Invoice No", keys:["INVOICE NO"], type:"text" },
-  { key:"fromReceived", label:"From Received", keys:["FROM RECEIVED"], type:"text" },
-  { key:"yardCoilNo", label:"Yard Coil No", keys:["YARD COIL NO."], type:"text" },
-  { key:"challan", label:"Challan", keys:["Challan"], type:"text" },
-  { key:"specification", label:"Specification", keys:["Specification"], type:"text" },
-  { key:"thickness", label:"Thick (mm)", keys:["Thick In Mm"], type:"number" },
-  { key:"width", label:"Width (mm)", keys:["Width In Mm"], type:"number" },
-  { key:"hsn", label:"HSN Code", keys:["hsn code"], type:"text" },
-  { key:"length", label:"Length", keys:["LENGTH"], type:"number" },
-  { key:"rate", label:"Rate", keys:["Rate"], type:"number" },
-  { key:"qtyMT", label:"Qty (MT)", keys:["Qty. In M.T."], type:"number" },
-  { key:"balanceWeight", label:"Balance (MT)", keys:["Balance Weight"], type:"number" },
-  { key:"kantaWeight", label:"Kanta Weight", keys:["kanta weight","Kanta Weight"], type:"number" },
-  { key:"remarks", label:"Remarks", keys:["REMARKS"], type:"text" },
-  { key:"cw1", label:"Cut Wt 1", keys:["cutting weight1"], type:"number" },
-  { key:"cw2", label:"Cut Wt 2", keys:["cutting weight2"], type:"number" },
-  { key:"cw3", label:"Cut Wt 3", keys:["cutting weight3"], type:"number" },
-  { key:"cw4", label:"Cut Wt 4", keys:["cutting weight4"], type:"number" },
-  { key:"cw5", label:"Cut Wt 5", keys:["cutting weight5"], type:"number" },
-  { key:"totalCutWt", label:"Total Cut Wt", keys:["total cutting weight"], type:"number" },
-  { key:"actualBalShape", label:"Actual Bal Shape", keys:["actul balance coil shape"], type:"number" },
-  { key:"shape", label:"Shape/Status", keys:["SHAPE"], type:"text" },
-  { key:"receive", label:"Receive", keys:["RECIVE"], type:"text" },
-  { key:"block", label:"Block", keys:["BLOK"], type:"text" },
-  { key:"chq", label:"CHQ", keys:["CHQ"], type:"text" },
-  { key:"cuttingSize", label:"Cutting Size", keys:["CUTTING SIZE"], type:"text" },
-  { key:"balance2", label:"Balance", keys:["BALANCE"], type:"text" },
-  { key:"aCol", label:"A", keys:["A"], type:"number" },
-  { key:"a1Col", label:"A1", keys:["A1"], type:"number" },
-  { key:"bCol", label:"B", keys:["B"], type:"number" },
-  { key:"b2Col", label:"B2", keys:["B2"], type:"number" },
-  { key:"cCol", label:"C", keys:["C"], type:"number" },
-  { key:"c2Col", label:"C2", keys:["C2"], type:"number" },
-  { key:"dCol", label:"D", keys:["D"], type:"number" },
-  { key:"d2Col", label:"D2", keys:["D2"], type:"number" },
-  { key:"diff", label:"Diff", keys:["DIFF"], type:"number" },
-  { key:"ageing", label:"Ageing (d)", keys:["AGEING Days","DAYS"], type:"number" },
-  { key:"source", label:"Sheet", keys:[], type:"text" },
-];
-
-function normalizeRow(row, sheetName, idx){
-  const rec = { id: sheetName + "-" + idx };
+const COLUMNS = [{
+  key: "company",
+  label: "Company",
+  keys: ["COMPANY NAME", "firm"],
+  type: "text"
+}, {
+  key: "sno",
+  label: "S.No",
+  keys: ["S.NO"],
+  type: "number"
+}, {
+  key: "date",
+  label: "Date",
+  keys: ["DATE"],
+  type: "date"
+}, {
+  key: "grade",
+  label: "Grade",
+  keys: ["GRADE"],
+  type: "text"
+}, {
+  key: "make",
+  label: "Make",
+  keys: ["Make"],
+  type: "text"
+}, {
+  key: "coilNo",
+  label: "Coil No",
+  keys: ["Coil No."],
+  type: "text"
+}, {
+  key: "cPercent",
+  label: "C%",
+  keys: ["C%"],
+  type: "number"
+}, {
+  key: "ys",
+  label: "YS",
+  keys: ["YS"],
+  type: "number"
+}, {
+  key: "uts",
+  label: "UTS",
+  keys: ["UTS"],
+  type: "number"
+}, {
+  key: "cutter",
+  label: "Cutter",
+  keys: ["Name Of The Cutter"],
+  type: "text"
+}, {
+  key: "invoiceNo",
+  label: "Invoice No",
+  keys: ["INVOICE NO"],
+  type: "text"
+}, {
+  key: "fromReceived",
+  label: "From Received",
+  keys: ["FROM RECEIVED"],
+  type: "text"
+}, {
+  key: "yardCoilNo",
+  label: "Yard Coil No",
+  keys: ["YARD COIL NO."],
+  type: "text"
+}, {
+  key: "challan",
+  label: "Challan",
+  keys: ["Challan"],
+  type: "text"
+}, {
+  key: "specification",
+  label: "Specification",
+  keys: ["Specification"],
+  type: "text"
+}, {
+  key: "thickness",
+  label: "Thick (mm)",
+  keys: ["Thick In Mm"],
+  type: "number"
+}, {
+  key: "width",
+  label: "Width (mm)",
+  keys: ["Width In Mm"],
+  type: "number"
+}, {
+  key: "hsn",
+  label: "HSN Code",
+  keys: ["hsn code"],
+  type: "text"
+}, {
+  key: "length",
+  label: "Length",
+  keys: ["LENGTH"],
+  type: "number"
+}, {
+  key: "rate",
+  label: "Rate",
+  keys: ["Rate"],
+  type: "number"
+}, {
+  key: "qtyMT",
+  label: "Qty (MT)",
+  keys: ["Qty. In M.T."],
+  type: "number"
+}, {
+  key: "balanceWeight",
+  label: "Balance (MT)",
+  keys: ["Balance Weight"],
+  type: "number"
+}, {
+  key: "kantaWeight",
+  label: "Kanta Weight",
+  keys: ["kanta weight", "Kanta Weight"],
+  type: "number"
+}, {
+  key: "remarks",
+  label: "Remarks",
+  keys: ["REMARKS"],
+  type: "text"
+}, {
+  key: "cw1",
+  label: "Cut Wt 1",
+  keys: ["cutting weight1"],
+  type: "number"
+}, {
+  key: "cw2",
+  label: "Cut Wt 2",
+  keys: ["cutting weight2"],
+  type: "number"
+}, {
+  key: "cw3",
+  label: "Cut Wt 3",
+  keys: ["cutting weight3"],
+  type: "number"
+}, {
+  key: "cw4",
+  label: "Cut Wt 4",
+  keys: ["cutting weight4"],
+  type: "number"
+}, {
+  key: "cw5",
+  label: "Cut Wt 5",
+  keys: ["cutting weight5"],
+  type: "number"
+}, {
+  key: "totalCutWt",
+  label: "Total Cut Wt",
+  keys: ["total cutting weight"],
+  type: "number"
+}, {
+  key: "actualBalShape",
+  label: "Actual Bal Shape",
+  keys: ["actul balance coil shape"],
+  type: "number"
+}, {
+  key: "shape",
+  label: "Shape/Status",
+  keys: ["SHAPE"],
+  type: "text"
+}, {
+  key: "receive",
+  label: "Receive",
+  keys: ["RECIVE"],
+  type: "text"
+}, {
+  key: "block",
+  label: "Block",
+  keys: ["BLOK"],
+  type: "text"
+}, {
+  key: "chq",
+  label: "CHQ",
+  keys: ["CHQ"],
+  type: "text"
+}, {
+  key: "cuttingSize",
+  label: "Cutting Size",
+  keys: ["CUTTING SIZE"],
+  type: "text"
+}, {
+  key: "balance2",
+  label: "Balance",
+  keys: ["BALANCE"],
+  type: "text"
+}, {
+  key: "aCol",
+  label: "A",
+  keys: ["A"],
+  type: "number"
+}, {
+  key: "a1Col",
+  label: "A1",
+  keys: ["A1"],
+  type: "number"
+}, {
+  key: "bCol",
+  label: "B",
+  keys: ["B"],
+  type: "number"
+}, {
+  key: "b2Col",
+  label: "B2",
+  keys: ["B2"],
+  type: "number"
+}, {
+  key: "cCol",
+  label: "C",
+  keys: ["C"],
+  type: "number"
+}, {
+  key: "c2Col",
+  label: "C2",
+  keys: ["C2"],
+  type: "number"
+}, {
+  key: "dCol",
+  label: "D",
+  keys: ["D"],
+  type: "number"
+}, {
+  key: "d2Col",
+  label: "D2",
+  keys: ["D2"],
+  type: "number"
+}, {
+  key: "diff",
+  label: "Diff",
+  keys: ["DIFF"],
+  type: "number"
+}, {
+  key: "ageing",
+  label: "Ageing (d)",
+  keys: ["AGEING Days", "DAYS"],
+  type: "number"
+}, {
+  key: "source",
+  label: "Sheet",
+  keys: [],
+  type: "text"
+}];
+function normalizeRow(row, sheetName, idx) {
+  const rec = {
+    id: sheetName + "-" + idx
+  };
   COLUMNS.forEach(col => {
     if (col.key === "source") return;
     const raw = pick(row, col.keys);
@@ -283,42 +521,70 @@ function normalizeRow(row, sheetName, idx){
   rec.source = sheetName;
   return rec;
 }
-
-function BookingCard({ b, onExport }) {
+function BookingCard({
+  b,
+  onExport
+}) {
   const [open, setOpen] = useState(false);
-  return (
-    <div className="booking-card">
-      <div className="booking-card-head" onClick={() => setOpen(o => !o)}>
-        <div>
-          <span className="booking-id">{b.id}</span>
-          <div className="booking-meta">
-            {b.party} &middot; {b.date} &middot; {b.items.length} coil(s) &middot; {b.totalQty.toFixed(2)} MT
-            {b.vehicle ? " \u00b7 " + b.vehicle : ""}
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); onExport(); }}>
-            <Icon name="download" size={14} /> Export
-          </button>
-          <Icon name={open ? "expand_less" : "expand_more"} size={20} />
-        </div>
-      </div>
-      {open && (
-        <div className="booking-items">
-          {b.items.map((it, i) => (
-            <div className="booking-item-row" key={i}>
-              <span>{it.grade} &middot; {it.make} &middot; Coil {it.coilNo} / Yard {it.yardCoilNo}</span>
-              <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>{it.qtyBooked.toFixed(2)} MT</span>
-            </div>
-          ))}
-          {b.remarks && <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-soft)" }}>Remarks: {b.remarks}</div>}
-        </div>
-      )}
-    </div>
-  );
+  return /*#__PURE__*/_jsxDEV("div", {
+    className: "booking-card",
+    children: [/*#__PURE__*/_jsxDEV("div", {
+      className: "booking-card-head",
+      onClick: () => setOpen(o => !o),
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          className: "booking-id",
+          children: b.id
+        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+          className: "booking-meta",
+          children: [b.party, " · ", b.date, " · ", b.items.length, " coil(s) · ", b.totalQty.toFixed(2), " MT", b.vehicle ? " \u00b7 " + b.vehicle : ""]
+        }, void 0, true)]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        },
+        children: [/*#__PURE__*/_jsxDEV("button", {
+          className: "btn btn-outline btn-sm",
+          onClick: e => {
+            e.stopPropagation();
+            onExport();
+          },
+          children: [/*#__PURE__*/_jsxDEV(Icon, {
+            name: "download",
+            size: 14
+          }, void 0, false), " Export"]
+        }, void 0, true), /*#__PURE__*/_jsxDEV(Icon, {
+          name: open ? "expand_less" : "expand_more",
+          size: 20
+        }, void 0, false)]
+      }, void 0, true)]
+    }, void 0, true), open && /*#__PURE__*/_jsxDEV("div", {
+      className: "booking-items",
+      children: [b.items.map((it, i) => /*#__PURE__*/_jsxDEV("div", {
+        className: "booking-item-row",
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          children: [it.grade, " · ", it.make, " · Coil ", it.coilNo, " / Yard ", it.yardCoilNo]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            fontFamily: "'IBM Plex Mono',monospace",
+            fontWeight: 700
+          },
+          children: [it.qtyBooked.toFixed(2), " MT"]
+        }, void 0, true)]
+      }, i, true)), b.remarks && /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          marginTop: 8,
+          fontSize: 12,
+          color: "var(--ink-soft)"
+        },
+        children: ["Remarks: ", b.remarks]
+      }, void 0, true)]
+    }, void 0, true)]
+  }, void 0, true);
 }
-
-function App(){
+function App() {
   const [records, setRecords] = useState([]);
   const [original, setOriginal] = useState([]);
   const [fileName, setFileName] = useState("");
@@ -326,10 +592,8 @@ function App(){
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
-
   const [activeTab, setActiveTab] = useState("stock");
   const [showFilters, setShowFilters] = useState(true);
-
   const [search, setSearch] = useState("");
   const [fCompany, setFCompany] = useState("ALL");
   const [fGrade, setFGrade] = useState("ALL");
@@ -348,31 +612,37 @@ function App(){
   const [nfMax, setNfMax] = useState("");
   const [nfFrom, setNfFrom] = useState("");
   const [nfTo, setNfTo] = useState("");
-
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [cartQty, setCartQty] = useState({});
   const [cartOpen, setCartOpen] = useState(false);
   const [bookings, setBookings] = useState([]);
   const [toast, setToast] = useState("");
-
-  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(""), 3800); }, []);
-
-  const handleFile = useCallback((file) => {
+  const showToast = useCallback(msg => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3800);
+  }, []);
+  const handleFile = useCallback(file => {
     if (!file) return;
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       try {
         const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: "array", cellDates: true });
+        const wb = XLSX.read(data, {
+          type: "array",
+          cellDates: true
+        });
         const targetSheets = wb.SheetNames.filter(n => wb.Sheets[n] && Object.keys(wb.Sheets[n]).length > 0);
         let all = [];
-        targetSheets.forEach((sheetName) => {
+        targetSheets.forEach(sheetName => {
           const ws = wb.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: true });
+          const json = XLSX.utils.sheet_to_json(ws, {
+            defval: "",
+            raw: true
+          });
           json.forEach((row, idx) => {
             const norm = normalizeRow(row, sheetName, idx);
             if (norm.coilNo || norm.yardCoilNo || norm.company) all.push(norm);
@@ -380,13 +650,18 @@ function App(){
         });
         if (all.length === 0) {
           setError("Is file mein koi readable stock row nahi mili. Sheet format check karein.");
-          setLoading(false); return;
+          setLoading(false);
+          return;
         }
         setRecords(all);
         setOriginal(JSON.parse(JSON.stringify(all)));
         setFileName(file.name);
         setLoadedSheets(targetSheets);
-        setSelectedIds(new Set()); setCartQty({}); setBookings([]); setPage(1); setFilters([]);
+        setSelectedIds(new Set());
+        setCartQty({});
+        setBookings([]);
+        setPage(1);
+        setFilters([]);
         setLoading(false);
         showToast("Loaded " + all.length + " rows \u00b7 " + (COLUMNS.length - 1) + " columns from " + targetSheets.length + " sheet(s)");
       } catch (err) {
@@ -396,53 +671,81 @@ function App(){
     };
     reader.readAsArrayBuffer(file);
   }, [showToast]);
-
-  const onDrop = useCallback((e) => { e.preventDefault(); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); }, [handleFile]);
-
+  const onDrop = useCallback(e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  }, [handleFile]);
   const facets = useMemo(() => {
-    const companies = new Set(), grades = new Set(), makes = new Set();
-    records.forEach(r => { if (r.company) companies.add(r.company); if (r.grade) grades.add(r.grade); if (r.make) makes.add(r.make); });
+    const companies = new Set(),
+      grades = new Set(),
+      makes = new Set();
+    records.forEach(r => {
+      if (r.company) companies.add(r.company);
+      if (r.grade) grades.add(r.grade);
+      if (r.make) makes.add(r.make);
+    });
     return {
       companies: ["ALL"].concat(Array.from(companies).sort()),
       grades: ["ALL"].concat(Array.from(grades).sort()),
-      makes: ["ALL"].concat(Array.from(makes).sort()),
+      makes: ["ALL"].concat(Array.from(makes).sort())
     };
   }, [records]);
-
   const kpis = useMemo(() => {
-    let totalBalance = 0, available = 0, cutting = 0, pack = 0, aged = 0;
+    let totalBalance = 0,
+      available = 0,
+      cutting = 0,
+      pack = 0,
+      aged = 0;
     const companies = new Set();
     records.forEach(r => {
       if (r.company) companies.add(r.company);
       if (r.balanceWeight > 0.005) {
-        totalBalance += r.balanceWeight; available += 1;
+        totalBalance += r.balanceWeight;
+        available += 1;
         const s = statusOf(r.shape).cls;
         if (s === "st-cutting") cutting += 1;
         if (s === "st-pack") pack += 1;
         if (r.ageing >= 365) aged += 1;
       }
     });
-    return { total: records.length, totalBalance, available, cutting, pack, companies: companies.size, aged };
+    return {
+      total: records.length,
+      totalBalance,
+      available,
+      cutting,
+      pack,
+      companies: companies.size,
+      aged
+    };
   }, [records]);
-
   const nfColDef = COLUMNS.find(c => c.key === nfCol) || COLUMNS[0];
   const distinctForNfCol = useMemo(() => {
     const set = new Set();
-    records.forEach(r => { const v = r[nfCol]; if (v !== undefined && v !== null && v !== "") set.add(String(v)); });
+    records.forEach(r => {
+      const v = r[nfCol];
+      if (v !== undefined && v !== null && v !== "") set.add(String(v));
+    });
     return Array.from(set).sort();
   }, [records, nfCol]);
   const useSelectForNf = nfColDef.type === "text" && distinctForNfCol.length > 0 && distinctForNfCol.length <= 80;
-
   const addFilter = () => {
     const def = nfColDef;
-    let f = { id: Date.now() + Math.random(), key: nfCol, label: def.label, type: def.type };
+    let f = {
+      id: Date.now() + Math.random(),
+      key: nfCol,
+      label: def.label,
+      type: def.type
+    };
     if (def.type === "number") {
       if (nfMin === "" && nfMax === "") return;
-      f.min = nfMin; f.max = nfMax;
+      f.min = nfMin;
+      f.max = nfMax;
       f.display = (nfMin !== "" ? "\u2265" + nfMin : "") + " " + (nfMax !== "" ? "\u2264" + nfMax : "");
     } else if (def.type === "date") {
       if (!nfFrom && !nfTo) return;
-      f.from = nfFrom; f.to = nfTo;
+      f.from = nfFrom;
+      f.to = nfTo;
       f.display = (nfFrom || "...") + " \u2192 " + (nfTo || "...");
     } else {
       if (!nfText.trim()) return;
@@ -450,11 +753,17 @@ function App(){
       f.display = nfText.trim();
     }
     setFilters(prev => [...prev, f]);
-    setNfText(""); setNfMin(""); setNfMax(""); setNfFrom(""); setNfTo("");
+    setNfText("");
+    setNfMin("");
+    setNfMax("");
+    setNfFrom("");
+    setNfTo("");
     setPage(1);
   };
-  const removeFilter = (id) => { setFilters(prev => prev.filter(f => f.id !== id)); setPage(1); };
-
+  const removeFilter = id => {
+    setFilters(prev => prev.filter(f => f.id !== id));
+    setPage(1);
+  };
   const matchesFilter = (r, f) => {
     if (f.type === "number") {
       const v = num(r[f.key]);
@@ -471,7 +780,6 @@ function App(){
     const val = (r[f.key] || "").toString().toLowerCase();
     return val.includes(f.value.toLowerCase());
   };
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return records.filter(r => {
@@ -483,7 +791,9 @@ function App(){
       if (fStatus !== "ALL" && statusOf(r.shape).cls !== fStatus) return false;
       if (thickMin !== "" && r.thickness < parseFloat(thickMin)) return false;
       if (thickMax !== "" && r.thickness > parseFloat(thickMax)) return false;
-      for (let i = 0; i < filters.length; i++) { if (!matchesFilter(r, filters[i])) return false; }
+      for (let i = 0; i < filters.length; i++) {
+        if (!matchesFilter(r, filters[i])) return false;
+      }
       if (q) {
         const hay = COLUMNS.map(c => r[c.key]).join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
@@ -491,96 +801,143 @@ function App(){
       return true;
     }).sort((a, b) => dateSortValue(b.date) - dateSortValue(a.date));
   }, [records, search, fCompany, fGrade, fMake, fSource, fStatus, onlyAvailable, thickMin, thickMax, filters]);
-
   const filteredTotal = useMemo(() => filtered.reduce((s, r) => s + r.balanceWeight, 0), [filtered]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
   const resetFilters = () => {
-    setSearch(""); setFCompany("ALL"); setFGrade("ALL"); setFMake("ALL");
-    setFStatus("ALL"); setFSource("ALL"); setOnlyAvailable(true);
-    setThickMin(""); setThickMax(""); setFilters([]); setPage(1);
+    setSearch("");
+    setFCompany("ALL");
+    setFGrade("ALL");
+    setFMake("ALL");
+    setFStatus("ALL");
+    setFSource("ALL");
+    setOnlyAvailable(true);
+    setThickMin("");
+    setThickMax("");
+    setFilters([]);
+    setPage(1);
   };
-
-  const toggleSelect = (r) => {
+  const toggleSelect = r => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(r.id)) {
         next.delete(r.id);
-        setCartQty(c => { const nc = { ...c }; delete nc[r.id]; return nc; });
+        setCartQty(c => {
+          const nc = {
+            ...c
+          };
+          delete nc[r.id];
+          return nc;
+        });
       } else {
         if (r.balanceWeight <= 0.005) return prev;
         next.add(r.id);
-        setCartQty(c => ({ ...c, [r.id]: r.balanceWeight }));
+        setCartQty(c => ({
+          ...c,
+          [r.id]: r.balanceWeight
+        }));
       }
       return next;
     });
   };
-
-  const removeFromCart = (id) => {
-    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
-    setCartQty(c => { const nc = { ...c }; delete nc[id]; return nc; });
+  const removeFromCart = id => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
+    });
+    setCartQty(c => {
+      const nc = {
+        ...c
+      };
+      delete nc[id];
+      return nc;
+    });
   };
-
   const cartItems = useMemo(() => records.filter(r => selectedIds.has(r.id)), [records, selectedIds]);
   const cartTotalQty = useMemo(() => cartItems.reduce((s, r) => s + num(cartQty[r.id]), 0), [cartItems, cartQty]);
-
   const setQty = (id, val, max) => {
     let v = parseFloat(val);
     if (isNaN(v)) v = 0;
     if (v < 0) v = 0;
     if (v > max) v = max;
-    setCartQty(c => ({ ...c, [id]: v }));
+    setCartQty(c => ({
+      ...c,
+      [id]: v
+    }));
   };
-
   const [bkParty, setBkParty] = useState("");
   const [bkDate, setBkDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [bkVehicle, setBkVehicle] = useState("");
   const [bkRemarks, setBkRemarks] = useState("");
   const [bkError, setBkError] = useState("");
-
   const saveBooking = () => {
-    if (!bkParty.trim()) { setBkError("Party ka naam daalein."); return; }
-    if (cartItems.length === 0) { setBkError("Kam se kam ek coil select karein."); return; }
+    if (!bkParty.trim()) {
+      setBkError("Party ka naam daalein.");
+      return;
+    }
+    if (cartItems.length === 0) {
+      setBkError("Kam se kam ek coil select karein.");
+      return;
+    }
     const items = cartItems.map(r => ({
-      recordId: r.id, company: r.company, grade: r.grade, make: r.make,
-      coilNo: r.coilNo, yardCoilNo: r.yardCoilNo, thickness: r.thickness,
-      width: r.width, qtyBooked: num(cartQty[r.id]),
+      recordId: r.id,
+      company: r.company,
+      grade: r.grade,
+      make: r.make,
+      coilNo: r.coilNo,
+      yardCoilNo: r.yardCoilNo,
+      thickness: r.thickness,
+      width: r.width,
+      qtyBooked: num(cartQty[r.id])
     })).filter(it => it.qtyBooked > 0);
-    if (items.length === 0) { setBkError("Booking quantity 0 se zyada honi chahiye."); return; }
-
+    if (items.length === 0) {
+      setBkError("Booking quantity 0 se zyada honi chahiye.");
+      return;
+    }
     const bookingId = "BK-" + String(bookings.length + 1).padStart(3, "0");
     const totalQty = items.reduce((s, it) => s + it.qtyBooked, 0);
-    setBookings(prev => [{ id: bookingId, party: bkParty.trim(), date: bkDate, vehicle: bkVehicle.trim(), remarks: bkRemarks.trim(), items, totalQty, createdAt: new Date() }, ...prev]);
-
+    setBookings(prev => [{
+      id: bookingId,
+      party: bkParty.trim(),
+      date: bkDate,
+      vehicle: bkVehicle.trim(),
+      remarks: bkRemarks.trim(),
+      items,
+      totalQty,
+      createdAt: new Date()
+    }, ...prev]);
     setRecords(prev => prev.map(r => {
       const it = items.find(i => i.recordId === r.id);
       if (!it) return r;
-      return { ...r, balanceWeight: Math.max(0, r.balanceWeight - it.qtyBooked) };
+      return {
+        ...r,
+        balanceWeight: Math.max(0, r.balanceWeight - it.qtyBooked)
+      };
     }));
-
-    setSelectedIds(new Set()); setCartQty({});
+    setSelectedIds(new Set());
+    setCartQty({});
     const savedParty = bkParty.trim();
-    setBkParty(""); setBkVehicle(""); setBkRemarks(""); setBkError("");
+    setBkParty("");
+    setBkVehicle("");
+    setBkRemarks("");
+    setBkError("");
     setCartOpen(false);
     showToast(bookingId + " saved for " + savedParty + " \u2014 " + fmt(totalQty) + " MT. Agli booking ke liye aur coils select karein.");
   };
-
   const resetSession = () => {
     if (!window.confirm("Sabhi bookings clear ho jayengi aur stock original balance par reset ho jayega. Continue?")) return;
     setRecords(JSON.parse(JSON.stringify(original)));
-    setBookings([]); setSelectedIds(new Set()); setCartQty({});
+    setBookings([]);
+    setSelectedIds(new Set());
+    setCartQty({});
     showToast("Session reset ho gaya.");
   };
-
   const exportRows = (rows, filename) => {
     const data = rows.map(r => {
       const o = {};
       COLUMNS.forEach(c => {
-        if (c.key === "date") o[c.label] = fmtDate(r.date);
-        else if (c.key === "shape") o[c.label] = statusOf(r.shape).label;
-        else if (c.type === "number") o[c.label] = Number(num(r[c.key]).toFixed(3));
-        else o[c.label] = r[c.key];
+        if (c.key === "date") o[c.label] = fmtDate(r.date);else if (c.key === "shape") o[c.label] = statusOf(r.shape).label;else if (c.type === "number") o[c.label] = Number(num(r[c.key]).toFixed(3));else o[c.label] = r[c.key];
       });
       return o;
     });
@@ -589,29 +946,45 @@ function App(){
     XLSX.utils.book_append_sheet(wb, ws, "Stock");
     XLSX.writeFile(wb, filename);
   };
-
-  const exportBooking = (b) => {
+  const exportBooking = b => {
     const data = b.items.map(it => ({
-      "Booking ID": b.id, Party: b.party, "Booking Date": b.date, Vehicle: b.vehicle,
-      Company: it.company, Grade: it.grade, Make: it.make, "Coil No": it.coilNo,
-      "Yard Coil No": it.yardCoilNo, "Thick (mm)": it.thickness, "Width (mm)": it.width,
-      "Qty Booked (MT)": it.qtyBooked, Remarks: b.remarks,
+      "Booking ID": b.id,
+      Party: b.party,
+      "Booking Date": b.date,
+      Vehicle: b.vehicle,
+      Company: it.company,
+      Grade: it.grade,
+      Make: it.make,
+      "Coil No": it.coilNo,
+      "Yard Coil No": it.yardCoilNo,
+      "Thick (mm)": it.thickness,
+      "Width (mm)": it.width,
+      "Qty Booked (MT)": it.qtyBooked,
+      Remarks: b.remarks
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, b.id);
     XLSX.writeFile(wb, b.id + "_" + b.party.replace(/\s+/g, "_") + ".xlsx");
   };
-
   const exportAllBookings = () => {
     const data = [];
     bookings.forEach(b => {
       b.items.forEach(it => {
         data.push({
-          "Booking ID": b.id, Party: b.party, "Booking Date": b.date, Vehicle: b.vehicle,
-          Company: it.company, Grade: it.grade, Make: it.make, "Coil No": it.coilNo,
-          "Yard Coil No": it.yardCoilNo, "Thick (mm)": it.thickness, "Width (mm)": it.width,
-          "Qty Booked (MT)": it.qtyBooked, Remarks: b.remarks,
+          "Booking ID": b.id,
+          Party: b.party,
+          "Booking Date": b.date,
+          Vehicle: b.vehicle,
+          Company: it.company,
+          Grade: it.grade,
+          Make: it.make,
+          "Coil No": it.coilNo,
+          "Yard Coil No": it.yardCoilNo,
+          "Thick (mm)": it.thickness,
+          "Width (mm)": it.width,
+          "Qty Booked (MT)": it.qtyBooked,
+          Remarks: b.remarks
         });
       });
     });
@@ -620,423 +993,899 @@ function App(){
     XLSX.utils.book_append_sheet(wb, ws, "All Bookings");
     XLSX.writeFile(wb, "RIU_All_Bookings.xlsx");
   };
-
   const displayCols = COLUMNS;
-
-  return (
-    <div>
-      <div className="rd-header">
-        <div className="rd-header-row">
-          <div className="rd-title">
-            <div className="rd-badge"><Icon name="layers" size={22} color="#fff" /></div>
-            <div>
-              <h1 className="disp">RIU Coil Live Dashboard</h1>
-              <p>Rajasthan Ispat Udyog &mdash; Coil Stock &amp; Booking, Jaipur</p>
-            </div>
-          </div>
-          <div className="rd-actions">
-            {records.length > 0 && (
-              <React.Fragment>
-                <span style={{ fontSize: 12, color: "#AEB6C2" }}>
-                  <Icon name="description" size={14} style={{ marginRight: 4 }} />
-                  {fileName} &middot; {loadedSheets.join(", ")}
-                </span>
-                <button className="btn btn-ghost btn-sm" onClick={resetSession}>
-                  <Icon name="restart_alt" size={15} /> Reset Session
-                </button>
-              </React.Fragment>
-            )}
-            <button className="btn btn-accent" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
-              <Icon name="upload_file" size={16} /> {records.length > 0 ? "Change File" : "Upload Excel"}
-            </button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: "none" }}
-              onChange={(e) => handleFile(e.target.files && e.target.files[0])} />
-          </div>
-        </div>
-      </div>
-      <div className="rd-hazard" />
-
-      <div className="rd-body">
-        {records.length === 0 ? (
-          <div className="rd-empty" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-            <Icon name="speed" size={36} color="#D6541F" />
-            <h2 className="disp">Upload your stock register to go live</h2>
-            <p>
-              CUTTER_2026-27.xlsm jaisi file upload karein &mdash; Sheet1 aur RIU JOB dono
-              sheets, sabhi 46 columns automatically padh li jayengi. Sab kuch is browser
-              ke andar chalta hai, koi server par upload nahi hota.
-            </p>
-            <div className="rd-drop" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
-              <Icon name="upload_file" size={26} color="#2F6690" style={{ marginBottom: 8, display: "block" }} />
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2F6690" }}>
-                {loading ? "Reading file..." : "Click or drag your .xlsx / .xlsm file here"}
-              </div>
-            </div>
-            {error && (
-              <div style={{ marginTop: 14, color: "var(--danger)", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                <Icon name="warning" size={16} /> {error}
-              </div>
-            )}
-          </div>
-        ) : (
-          <React.Fragment>
-            <div className="rd-tabs">
-              <div className="rd-tabs-left">
-                <div className={"rd-tab" + (activeTab === "stock" ? " active" : "")} onClick={() => setActiveTab("stock")}>
-                  <Icon name="inventory_2" size={16} /> Stock Dashboard
-                </div>
-                <div className={"rd-tab" + (activeTab === "bookings" ? " active" : "")} onClick={() => setActiveTab("bookings")}>
-                  <Icon name="assignment" size={16} /> Bookings {bookings.length > 0 ? "(" + bookings.length + ")" : ""}
-                </div>
-              </div>
-            </div>
-
-            {activeTab === "stock" && (
-              <React.Fragment>
-                <div className="kpi-grid">
-                  <div className="kpi-card">
-                    <div className="kpi-icon" style={{ background: "var(--steel-soft)" }}><Icon name="layers" size={16} color="var(--steel)" /></div>
-                    <div className="kpi-val">{fmtInt(kpis.total)}</div>
-                    <div className="kpi-label">Total Records</div>
-                  </div>
-                  <div className="kpi-card">
-                    <div className="kpi-icon" style={{ background: "var(--success-soft)" }}><Icon name="trending_up" size={16} color="var(--success)" /></div>
-                    <div className="kpi-val">{fmt(kpis.totalBalance, 1)}</div>
-                    <div className="kpi-label">Live Stock (MT)</div>
-                  </div>
-                  <div className="kpi-card">
-                    <div className="kpi-icon" style={{ background: "#FDEFE8" }}><Icon name="check_circle" size={16} color="var(--accent)" /></div>
-                    <div className="kpi-val">{fmtInt(kpis.available)}</div>
-                    <div className="kpi-label">Available Coils</div>
-                  </div>
-                  <div className="kpi-card">
-                    <div className="kpi-icon" style={{ background: "var(--warning-soft)" }}><Icon name="content_cut" size={16} color="var(--warning)" /></div>
-                    <div className="kpi-val">{fmtInt(kpis.cutting)}</div>
-                    <div className="kpi-label">In Cutting</div>
-                  </div>
-                  <div className="kpi-card">
-                    <div className="kpi-icon" style={{ background: "var(--success-soft)" }}><Icon name="inventory_2" size={16} color="var(--success)" /></div>
-                    <div className="kpi-val">{fmtInt(kpis.pack)}</div>
-                    <div className="kpi-label">Pack Ready</div>
-                  </div>
-                  <div className="kpi-card">
-                    <div className="kpi-icon" style={{ background: "var(--danger-soft)" }}><Icon name="apartment" size={16} color="var(--danger)" /></div>
-                    <div className="kpi-val">{fmtInt(kpis.companies)}</div>
-                    <div className="kpi-label">Companies</div>
-                  </div>
-                </div>
-
-                <div className="rd-filters">
-                  <div className="rd-filters-head" onClick={() => setShowFilters(s => !s)}>
-                    <h3 className="disp"><Icon name="tune" size={16} /> Filters {filters.length > 0 ? "(" + filters.length + " active)" : ""}</h3>
-                    <Icon name={showFilters ? "expand_less" : "expand_more"} size={20} />
-                  </div>
-                  {showFilters && (
-                    <React.Fragment>
-                      <div className="rd-filters-grid">
-                        <div className="rd-field rd-search">
-                          <label>Search (sabhi columns mein)</label>
-                          <Icon name="search" size={16} />
-                          <input placeholder="Kuch bhi type karein..." value={search}
-                            onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-                        </div>
-                        <div className="rd-field">
-                          <label>Company</label>
-                          <select value={fCompany} onChange={(e) => { setFCompany(e.target.value); setPage(1); }}>
-                            {facets.companies.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div className="rd-field">
-                          <label>Grade</label>
-                          <select value={fGrade} onChange={(e) => { setFGrade(e.target.value); setPage(1); }}>
-                            {facets.grades.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div className="rd-field">
-                          <label>Make</label>
-                          <select value={fMake} onChange={(e) => { setFMake(e.target.value); setPage(1); }}>
-                            {facets.makes.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div className="rd-field">
-                          <label>Status</label>
-                          <select value={fStatus} onChange={(e) => { setFStatus(e.target.value); setPage(1); }}>
-                            <option value="ALL">All Status</option>
-                            <option value="st-pack">Pack Ready</option>
-                            <option value="st-cutting">In Cutting</option>
-                            <option value="st-balance">Balance Left</option>
-                            <option value="st-other">Other</option>
-                          </select>
-                        </div>
-                        <div className="rd-field">
-                          <label>Sheet Source</label>
-                          <select value={fSource} onChange={(e) => { setFSource(e.target.value); setPage(1); }}>
-                            <option value="ALL">All Sheets</option>
-                            {loadedSheets.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="rd-filters-grid" style={{ marginTop: 10 }}>
-                        <div className="rd-field">
-                          <label>Thickness Min (mm)</label>
-                          <input type="number" value={thickMin} onChange={(e) => { setThickMin(e.target.value); setPage(1); }} placeholder="0" />
-                        </div>
-                        <div className="rd-field">
-                          <label>Thickness Max (mm)</label>
-                          <input type="number" value={thickMax} onChange={(e) => { setThickMax(e.target.value); setPage(1); }} placeholder="any" />
-                        </div>
-                      </div>
-                      <div className="rd-toggle-row">
-                        <label className="rd-switch">
-                          <input type="checkbox" checked={onlyAvailable}
-                            onChange={(e) => { setOnlyAvailable(e.target.checked); setPage(1); }} />
-                          Show only available stock (balance &gt; 0)
-                        </label>
-                        <button className="btn btn-outline btn-sm" onClick={resetFilters}>
-                          <Icon name="restart_alt" size={14} /> Clear All Filters
-                        </button>
-                      </div>
-
-                      {/* Generic any-column filter builder */}
-                      <div className="rd-addfilter">
-                        <div className="rd-field narrow" style={{ flex: "0 0 190px" }}>
-                          <label>Filter by any column</label>
-                          <select value={nfCol} onChange={(e) => { setNfCol(e.target.value); setNfText(""); setNfMin(""); setNfMax(""); setNfFrom(""); setNfTo(""); }}>
-                            {COLUMNS.filter(c => c.key !== "source").map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                          </select>
-                        </div>
-                        {nfColDef.type === "number" && (
-                          <React.Fragment>
-                            <div className="rd-field narrow">
-                              <label>Min</label>
-                              <input type="number" value={nfMin} onChange={(e) => setNfMin(e.target.value)} placeholder="e.g. 10" />
-                            </div>
-                            <div className="rd-field narrow">
-                              <label>Max</label>
-                              <input type="number" value={nfMax} onChange={(e) => setNfMax(e.target.value)} placeholder="e.g. 1500" />
-                            </div>
-                          </React.Fragment>
-                        )}
-                        {nfColDef.type === "date" && (
-                          <React.Fragment>
-                            <div className="rd-field narrow">
-                              <label>From</label>
-                              <input type="date" value={nfFrom} onChange={(e) => setNfFrom(e.target.value)} />
-                            </div>
-                            <div className="rd-field narrow">
-                              <label>To</label>
-                              <input type="date" value={nfTo} onChange={(e) => setNfTo(e.target.value)} />
-                            </div>
-                          </React.Fragment>
-                        )}
-                        {nfColDef.type === "text" && (
-                          <div className="rd-field">
-                            <label>Value</label>
-                            {useSelectForNf ? (
-                              <select value={nfText} onChange={(e) => setNfText(e.target.value)}>
-                                <option value="">Select...</option>
-                                {distinctForNfCol.map(v => <option key={v} value={v}>{v}</option>)}
-                              </select>
-                            ) : (
-                              <input value={nfText} onChange={(e) => setNfText(e.target.value)} placeholder="Contains text..." />
-                            )}
-                          </div>
-                        )}
-                        <button className="btn btn-steel btn-sm" onClick={addFilter}>
-                          <Icon name="add" size={15} /> Add Filter
-                        </button>
-                      </div>
-                      {filters.length > 0 && (
-                        <div className="filter-chips">
-                          {filters.map(f => (
-                            <div className="chip" key={f.id}>
-                              {f.label}: {f.display}
-                              <Icon name="close" size={15} onClick={() => removeFilter(f.id)} />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </React.Fragment>
-                  )}
-                </div>
-
-                <div className="rd-toolbar">
-                  <div className="rd-count">
-                    Showing <b>{pageRows.length}</b> of <b>{filtered.length}</b> records (total {fmtInt(records.length)} loaded) &middot; Filtered balance: <b>{fmt(filteredTotal, 2)} MT</b>
-                  </div>
-                  <div className="rd-toolbar-right">
-                    <select className="pagesize-select" value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}>
-                      <option value={25}>25 / page</option>
-                      <option value={50}>50 / page</option>
-                      <option value={100}>100 / page</option>
-                      <option value={250}>250 / page</option>
-                      <option value={5000}>Show All</option>
-                    </select>
-                    <button className="btn btn-outline btn-sm" onClick={() => exportRows(filtered, "RIU_Filtered_Stock.xlsx")}>
-                      <Icon name="download" size={14} /> Export Filtered ({filtered.length})
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rd-table-wrap">
-                  <table className="rd-table">
-                    <thead>
-                      <tr>
-                        <th className="sticky-col"></th>
-                        <th className="sticky-col2">Company</th>
-                        {displayCols.filter(c => c.key !== "company").map(c => <th key={c.key}>{c.label}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pageRows.map(r => {
-                        const isSel = selectedIds.has(r.id);
-                        const bookable = r.balanceWeight > 0.005;
-                        return (
-                          <tr key={r.id} className={isSel ? "selected" : ""}>
-                            <td className="sticky-col">
-                              <input type="checkbox" className="rd-chk" checked={isSel} disabled={!bookable} onChange={() => toggleSelect(r)} />
-                            </td>
-                            <td className="sticky-col2 txt">{r.company}</td>
-                            {displayCols.filter(c => c.key !== "company").map(c => {
-                              let val;
-                              if (c.key === "date") val = fmtDate(r.date);
-                              else if (c.key === "shape") { const st = statusOf(r.shape); val = <span className={"status-pill " + st.cls}>{st.label}</span>; }
-                              else if (c.key === "ageing") val = <span className={r.ageing >= 365 ? "aged-flag" : ""}>{fmtInt(r.ageing)}</span>;
-                              else if (c.type === "number") val = fmt(r[c.key], c.key === "sno" ? 0 : 2);
-                              else val = r[c.key] || "\u2014";
-                              return <td key={c.key} className={c.type === "text" ? "txt" : ""}>{val}</td>;
-                            })}
-                          </tr>
-                        );
-                      })}
-                      {pageRows.length === 0 && (
-                        <tr><td colSpan={displayCols.length + 1} style={{ textAlign: "center", padding: 30, color: "var(--ink-faint)" }}>
-                          Koi record match nahi hua. Filters adjust karein.
-                        </td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="rd-pagination">
-                  <button className="rd-page-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>&larr; Prev</button>
-                  <span style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Page {page} of {totalPages}</span>
-                  <button className="rd-page-btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next &rarr;</button>
-                </div>
-              </React.Fragment>
-            )}
-
-            {activeTab === "bookings" && (
-              <div>
-                <div className="rd-toolbar">
-                  <div className="rd-count">
-                    <b>{bookings.length}</b> booking(s) this session &middot; Total booked: <b>{fmt(bookings.reduce((s, b) => s + b.totalQty, 0), 2)} MT</b>
-                  </div>
-                  {bookings.length > 0 && (
-                    <button className="btn btn-outline btn-sm" onClick={exportAllBookings}>
-                      <Icon name="download" size={14} /> Export All Bookings
-                    </button>
-                  )}
-                </div>
-                {bookings.length === 0 ? (
-                  <div className="rd-empty" style={{ margin: "30px auto" }}>
-                    <Icon name="assignment" size={30} color="var(--ink-faint)" />
-                    <h2 className="disp" style={{ fontSize: 17 }}>No bookings yet</h2>
-                    <p>Stock Dashboard tab se coils select karein aur booking cart se save karein. Ek baar save karne ke baad turant agli booking ke liye naye coils select kar sakte hain.</p>
-                    <button className="btn btn-accent" onClick={() => setActiveTab("stock")}>
-                      Go to Stock Dashboard <Icon name="arrow_forward" size={15} />
-                    </button>
-                  </div>
-                ) : (
-                  bookings.map(b => <BookingCard key={b.id} b={b} onExport={() => exportBooking(b)} />)
-                )}
-              </div>
-            )}
-          </React.Fragment>
-        )}
-      </div>
-
-      {records.length > 0 && selectedIds.size > 0 && !cartOpen && (
-        <button className="fab-cart" onClick={() => setCartOpen(true)}>
-          <Icon name="shopping_cart" size={18} color="#fff" />
-          Booking Cart
-          <span className="fab-badge">{selectedIds.size}</span>
-        </button>
-      )}
-
-      {cartOpen && (
-        <React.Fragment>
-          <div className="rd-overlay" onClick={() => setCartOpen(false)} />
-          <div className="rd-drawer">
-            <div className="rd-drawer-head">
-              <h3><Icon name="shopping_cart" size={18} /> New Booking</h3>
-              <Icon name="close" size={20} style={{ cursor: "pointer" }} onClick={() => setCartOpen(false)} />
-            </div>
-            <div className="rd-drawer-body">
-              {cartItems.length === 0 ? (
-                <div className="rd-empty-cart">Cart khaali hai. Table se coils select karein.</div>
-              ) : (
-                cartItems.map(r => (
-                  <div className="cart-item" key={r.id}>
-                    <div className="cart-item-top">
-                      <div>
-                        <div className="cart-item-name">{r.grade || r.specification} &middot; {r.make}</div>
-                        <div className="cart-item-sub">Coil {r.coilNo} / Yard {r.yardCoilNo}</div>
-                      </div>
-                      <Icon name="delete" size={17} color="var(--danger)" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => removeFromCart(r.id)} />
-                    </div>
-                    <div className="cart-qty-row">
-                      <input type="number" step="0.01" min="0" max={r.balanceWeight}
-                        value={cartQty[r.id] !== undefined ? cartQty[r.id] : r.balanceWeight}
-                        onChange={(e) => setQty(r.id, e.target.value, r.balanceWeight)} />
-                      <span>MT of {fmt(r.balanceWeight, 2)} MT available</span>
-                    </div>
-                  </div>
-                ))
-              )}
-
-              <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                <div className="rd-form-field">
-                  <label><Icon name="apartment" size={13} /> Party Name *</label>
-                  <input value={bkParty} onChange={(e) => setBkParty(e.target.value)} placeholder="e.g. S.K Agarwal & Co" />
-                </div>
-                <div className="rd-form-field">
-                  <label><Icon name="event" size={13} /> Booking Date</label>
-                  <input type="date" value={bkDate} onChange={(e) => setBkDate(e.target.value)} />
-                </div>
-                <div className="rd-form-field">
-                  <label><Icon name="local_shipping" size={13} /> Vehicle No (optional)</label>
-                  <input value={bkVehicle} onChange={(e) => setBkVehicle(e.target.value)} placeholder="RJ14 ..." />
-                </div>
-                <div className="rd-form-field">
-                  <label>Remarks</label>
-                  <textarea rows={2} value={bkRemarks} onChange={(e) => setBkRemarks(e.target.value)} placeholder="Optional note" />
-                </div>
-                {bkError && <div style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{bkError}</div>}
-              </div>
-            </div>
-            <div className="rd-drawer-foot">
-              <div className="rd-total-row">
-                <span>Total Booking Qty</span>
-                <b>{fmt(cartTotalQty, 2)} MT</b>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} onClick={() => setCartOpen(false)}>Cancel</button>
-                <button className="btn btn-accent" style={{ flex: 2, justifyContent: "center" }} onClick={saveBooking}>
-                  <Icon name="check_circle" size={16} /> Save Booking
-                </button>
-              </div>
-            </div>
-          </div>
-        </React.Fragment>
-      )}
-
-      {toast && <div className="toast"><Icon name="check_circle" size={16} /> {toast}</div>}
-    </div>
-  );
+  return /*#__PURE__*/_jsxDEV("div", {
+    children: [/*#__PURE__*/_jsxDEV("div", {
+      className: "rd-header",
+      children: /*#__PURE__*/_jsxDEV("div", {
+        className: "rd-header-row",
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          className: "rd-title",
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "rd-badge",
+            children: /*#__PURE__*/_jsxDEV(Icon, {
+              name: "layers",
+              size: 22,
+              color: "#fff"
+            }, void 0, false)
+          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+            children: [/*#__PURE__*/_jsxDEV("h1", {
+              className: "disp",
+              children: "RIU Coil Live Dashboard"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("p", {
+              children: "Rajasthan Ispat Udyog — Coil Stock & Booking, Jaipur"
+            }, void 0, false)]
+          }, void 0, true)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          className: "rd-actions",
+          children: [records.length > 0 && /*#__PURE__*/_jsxDEV(React.Fragment, {
+            children: [/*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 12,
+                color: "#AEB6C2"
+              },
+              children: [/*#__PURE__*/_jsxDEV(Icon, {
+                name: "description",
+                size: 14,
+                style: {
+                  marginRight: 4
+                }
+              }, void 0, false), fileName, " · ", loadedSheets.join(", ")]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+              className: "btn btn-ghost btn-sm",
+              onClick: resetSession,
+              children: [/*#__PURE__*/_jsxDEV(Icon, {
+                name: "restart_alt",
+                size: 15
+              }, void 0, false), " Reset Session"]
+            }, void 0, true)]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+            className: "btn btn-accent",
+            onClick: () => fileInputRef.current && fileInputRef.current.click(),
+            children: [/*#__PURE__*/_jsxDEV(Icon, {
+              name: "upload_file",
+              size: 16
+            }, void 0, false), " ", records.length > 0 ? "Change File" : "Upload Excel"]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("input", {
+            ref: fileInputRef,
+            type: "file",
+            accept: ".xlsx,.xlsm,.xls",
+            style: {
+              display: "none"
+            },
+            onChange: e => handleFile(e.target.files && e.target.files[0])
+          }, void 0, false)]
+        }, void 0, true)]
+      }, void 0, true)
+    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+      className: "rd-hazard"
+    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+      className: "rd-body",
+      children: records.length === 0 ? /*#__PURE__*/_jsxDEV("div", {
+        className: "rd-empty",
+        onDragOver: e => e.preventDefault(),
+        onDrop: onDrop,
+        children: [/*#__PURE__*/_jsxDEV(Icon, {
+          name: "speed",
+          size: 36,
+          color: "#D6541F"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("h2", {
+          className: "disp",
+          children: "Upload your stock register to go live"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("p", {
+          children: "CUTTER_2026-27.xlsm jaisi file upload karein — Sheet1 aur RIU JOB dono sheets, sabhi 46 columns automatically padh li jayengi. Sab kuch is browser ke andar chalta hai, koi server par upload nahi hota."
+        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+          className: "rd-drop",
+          onClick: () => fileInputRef.current && fileInputRef.current.click(),
+          children: [/*#__PURE__*/_jsxDEV(Icon, {
+            name: "upload_file",
+            size: 26,
+            color: "#2F6690",
+            style: {
+              marginBottom: 8,
+              display: "block"
+            }
+          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: "#2F6690"
+            },
+            children: loading ? "Reading file..." : "Click or drag your .xlsx / .xlsm file here"
+          }, void 0, false)]
+        }, void 0, true), error && /*#__PURE__*/_jsxDEV("div", {
+          style: {
+            marginTop: 14,
+            color: "var(--danger)",
+            fontSize: 12.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            justifyContent: "center"
+          },
+          children: [/*#__PURE__*/_jsxDEV(Icon, {
+            name: "warning",
+            size: 16
+          }, void 0, false), " ", error]
+        }, void 0, true)]
+      }, void 0, true) : /*#__PURE__*/_jsxDEV(React.Fragment, {
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          className: "rd-tabs",
+          children: /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-tabs-left",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "rd-tab" + (activeTab === "stock" ? " active" : ""),
+              onClick: () => setActiveTab("stock"),
+              children: [/*#__PURE__*/_jsxDEV(Icon, {
+                name: "inventory_2",
+                size: 16
+              }, void 0, false), " Stock Dashboard"]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "rd-tab" + (activeTab === "bookings" ? " active" : ""),
+              onClick: () => setActiveTab("bookings"),
+              children: [/*#__PURE__*/_jsxDEV(Icon, {
+                name: "assignment",
+                size: 16
+              }, void 0, false), " Bookings ", bookings.length > 0 ? "(" + bookings.length + ")" : ""]
+            }, void 0, true)]
+          }, void 0, true)
+        }, void 0, false), activeTab === "stock" && /*#__PURE__*/_jsxDEV(React.Fragment, {
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "kpi-grid",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "kpi-card",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-icon",
+                style: {
+                  background: "var(--steel-soft)"
+                },
+                children: /*#__PURE__*/_jsxDEV(Icon, {
+                  name: "layers",
+                  size: 16,
+                  color: "var(--steel)"
+                }, void 0, false)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-val",
+                children: fmtInt(kpis.total)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-label",
+                children: "Total Records"
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "kpi-card",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-icon",
+                style: {
+                  background: "var(--success-soft)"
+                },
+                children: /*#__PURE__*/_jsxDEV(Icon, {
+                  name: "trending_up",
+                  size: 16,
+                  color: "var(--success)"
+                }, void 0, false)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-val",
+                children: fmt(kpis.totalBalance, 1)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-label",
+                children: "Live Stock (MT)"
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "kpi-card",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-icon",
+                style: {
+                  background: "#FDEFE8"
+                },
+                children: /*#__PURE__*/_jsxDEV(Icon, {
+                  name: "check_circle",
+                  size: 16,
+                  color: "var(--accent)"
+                }, void 0, false)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-val",
+                children: fmtInt(kpis.available)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-label",
+                children: "Available Coils"
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "kpi-card",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-icon",
+                style: {
+                  background: "var(--warning-soft)"
+                },
+                children: /*#__PURE__*/_jsxDEV(Icon, {
+                  name: "content_cut",
+                  size: 16,
+                  color: "var(--warning)"
+                }, void 0, false)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-val",
+                children: fmtInt(kpis.cutting)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-label",
+                children: "In Cutting"
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "kpi-card",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-icon",
+                style: {
+                  background: "var(--success-soft)"
+                },
+                children: /*#__PURE__*/_jsxDEV(Icon, {
+                  name: "inventory_2",
+                  size: 16,
+                  color: "var(--success)"
+                }, void 0, false)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-val",
+                children: fmtInt(kpis.pack)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-label",
+                children: "Pack Ready"
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "kpi-card",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-icon",
+                style: {
+                  background: "var(--danger-soft)"
+                },
+                children: /*#__PURE__*/_jsxDEV(Icon, {
+                  name: "apartment",
+                  size: 16,
+                  color: "var(--danger)"
+                }, void 0, false)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-val",
+                children: fmtInt(kpis.companies)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                className: "kpi-label",
+                children: "Companies"
+              }, void 0, false)]
+            }, void 0, true)]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-filters",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "rd-filters-head",
+              onClick: () => setShowFilters(s => !s),
+              children: [/*#__PURE__*/_jsxDEV("h3", {
+                className: "disp",
+                children: [/*#__PURE__*/_jsxDEV(Icon, {
+                  name: "tune",
+                  size: 16
+                }, void 0, false), " Filters ", filters.length > 0 ? "(" + filters.length + " active)" : ""]
+              }, void 0, true), /*#__PURE__*/_jsxDEV(Icon, {
+                name: showFilters ? "expand_less" : "expand_more",
+                size: 20
+              }, void 0, false)]
+            }, void 0, true), showFilters && /*#__PURE__*/_jsxDEV(React.Fragment, {
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                className: "rd-filters-grid",
+                children: [/*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field rd-search",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Search (sabhi columns mein)"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV(Icon, {
+                    name: "search",
+                    size: 16
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                    placeholder: "Kuch bhi type karein...",
+                    value: search,
+                    onChange: e => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Company"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
+                    value: fCompany,
+                    onChange: e => {
+                      setFCompany(e.target.value);
+                      setPage(1);
+                    },
+                    children: facets.companies.map(c => /*#__PURE__*/_jsxDEV("option", {
+                      value: c,
+                      children: c
+                    }, c, false))
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Grade"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
+                    value: fGrade,
+                    onChange: e => {
+                      setFGrade(e.target.value);
+                      setPage(1);
+                    },
+                    children: facets.grades.map(c => /*#__PURE__*/_jsxDEV("option", {
+                      value: c,
+                      children: c
+                    }, c, false))
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Make"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
+                    value: fMake,
+                    onChange: e => {
+                      setFMake(e.target.value);
+                      setPage(1);
+                    },
+                    children: facets.makes.map(c => /*#__PURE__*/_jsxDEV("option", {
+                      value: c,
+                      children: c
+                    }, c, false))
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Status"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
+                    value: fStatus,
+                    onChange: e => {
+                      setFStatus(e.target.value);
+                      setPage(1);
+                    },
+                    children: [/*#__PURE__*/_jsxDEV("option", {
+                      value: "ALL",
+                      children: "All Status"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                      value: "st-pack",
+                      children: "Pack Ready"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                      value: "st-cutting",
+                      children: "In Cutting"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                      value: "st-balance",
+                      children: "Balance Left"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                      value: "st-other",
+                      children: "Other"
+                    }, void 0, false)]
+                  }, void 0, true)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Sheet Source"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
+                    value: fSource,
+                    onChange: e => {
+                      setFSource(e.target.value);
+                      setPage(1);
+                    },
+                    children: [/*#__PURE__*/_jsxDEV("option", {
+                      value: "ALL",
+                      children: "All Sheets"
+                    }, void 0, false), loadedSheets.map(s => /*#__PURE__*/_jsxDEV("option", {
+                      value: s,
+                      children: s
+                    }, s, false))]
+                  }, void 0, true)]
+                }, void 0, true)]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                className: "rd-filters-grid",
+                style: {
+                  marginTop: 10
+                },
+                children: [/*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Thickness Min (mm)"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                    type: "number",
+                    value: thickMin,
+                    onChange: e => {
+                      setThickMin(e.target.value);
+                      setPage(1);
+                    },
+                    placeholder: "0"
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Thickness Max (mm)"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                    type: "number",
+                    value: thickMax,
+                    onChange: e => {
+                      setThickMax(e.target.value);
+                      setPage(1);
+                    },
+                    placeholder: "any"
+                  }, void 0, false)]
+                }, void 0, true)]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                className: "rd-toggle-row",
+                children: [/*#__PURE__*/_jsxDEV("label", {
+                  className: "rd-switch",
+                  children: [/*#__PURE__*/_jsxDEV("input", {
+                    type: "checkbox",
+                    checked: onlyAvailable,
+                    onChange: e => {
+                      setOnlyAvailable(e.target.checked);
+                      setPage(1);
+                    }
+                  }, void 0, false), "Show only available stock (balance > 0)"]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+                  className: "btn btn-outline btn-sm",
+                  onClick: resetFilters,
+                  children: [/*#__PURE__*/_jsxDEV(Icon, {
+                    name: "restart_alt",
+                    size: 14
+                  }, void 0, false), " Clear All Filters"]
+                }, void 0, true)]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                className: "rd-addfilter",
+                children: [/*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field narrow",
+                  style: {
+                    flex: "0 0 190px"
+                  },
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Filter by any column"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
+                    value: nfCol,
+                    onChange: e => {
+                      setNfCol(e.target.value);
+                      setNfText("");
+                      setNfMin("");
+                      setNfMax("");
+                      setNfFrom("");
+                      setNfTo("");
+                    },
+                    children: COLUMNS.filter(c => c.key !== "source").map(c => /*#__PURE__*/_jsxDEV("option", {
+                      value: c.key,
+                      children: c.label
+                    }, c.key, false))
+                  }, void 0, false)]
+                }, void 0, true), nfColDef.type === "number" && /*#__PURE__*/_jsxDEV(React.Fragment, {
+                  children: [/*#__PURE__*/_jsxDEV("div", {
+                    className: "rd-field narrow",
+                    children: [/*#__PURE__*/_jsxDEV("label", {
+                      children: "Min"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                      type: "number",
+                      value: nfMin,
+                      onChange: e => setNfMin(e.target.value),
+                      placeholder: "e.g. 10"
+                    }, void 0, false)]
+                  }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                    className: "rd-field narrow",
+                    children: [/*#__PURE__*/_jsxDEV("label", {
+                      children: "Max"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                      type: "number",
+                      value: nfMax,
+                      onChange: e => setNfMax(e.target.value),
+                      placeholder: "e.g. 1500"
+                    }, void 0, false)]
+                  }, void 0, true)]
+                }, void 0, true), nfColDef.type === "date" && /*#__PURE__*/_jsxDEV(React.Fragment, {
+                  children: [/*#__PURE__*/_jsxDEV("div", {
+                    className: "rd-field narrow",
+                    children: [/*#__PURE__*/_jsxDEV("label", {
+                      children: "From"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                      type: "date",
+                      value: nfFrom,
+                      onChange: e => setNfFrom(e.target.value)
+                    }, void 0, false)]
+                  }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                    className: "rd-field narrow",
+                    children: [/*#__PURE__*/_jsxDEV("label", {
+                      children: "To"
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+                      type: "date",
+                      value: nfTo,
+                      onChange: e => setNfTo(e.target.value)
+                    }, void 0, false)]
+                  }, void 0, true)]
+                }, void 0, true), nfColDef.type === "text" && /*#__PURE__*/_jsxDEV("div", {
+                  className: "rd-field",
+                  children: [/*#__PURE__*/_jsxDEV("label", {
+                    children: "Value"
+                  }, void 0, false), useSelectForNf ? /*#__PURE__*/_jsxDEV("select", {
+                    value: nfText,
+                    onChange: e => setNfText(e.target.value),
+                    children: [/*#__PURE__*/_jsxDEV("option", {
+                      value: "",
+                      children: "Select..."
+                    }, void 0, false), distinctForNfCol.map(v => /*#__PURE__*/_jsxDEV("option", {
+                      value: v,
+                      children: v
+                    }, v, false))]
+                  }, void 0, true) : /*#__PURE__*/_jsxDEV("input", {
+                    value: nfText,
+                    onChange: e => setNfText(e.target.value),
+                    placeholder: "Contains text..."
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+                  className: "btn btn-steel btn-sm",
+                  onClick: addFilter,
+                  children: [/*#__PURE__*/_jsxDEV(Icon, {
+                    name: "add",
+                    size: 15
+                  }, void 0, false), " Add Filter"]
+                }, void 0, true)]
+              }, void 0, true), filters.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+                className: "filter-chips",
+                children: filters.map(f => /*#__PURE__*/_jsxDEV("div", {
+                  className: "chip",
+                  children: [f.label, ": ", f.display, /*#__PURE__*/_jsxDEV(Icon, {
+                    name: "close",
+                    size: 15,
+                    onClick: () => removeFilter(f.id)
+                  }, void 0, false)]
+                }, f.id, true))
+              }, void 0, false)]
+            }, void 0, true)]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-toolbar",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "rd-count",
+              children: ["Showing ", /*#__PURE__*/_jsxDEV("b", {
+                children: pageRows.length
+              }, void 0, false), " of ", /*#__PURE__*/_jsxDEV("b", {
+                children: filtered.length
+              }, void 0, false), " records (total ", fmtInt(records.length), " loaded) · Filtered balance: ", /*#__PURE__*/_jsxDEV("b", {
+                children: [fmt(filteredTotal, 2), " MT"]
+              }, void 0, true)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "rd-toolbar-right",
+              children: [/*#__PURE__*/_jsxDEV("select", {
+                className: "pagesize-select",
+                value: pageSize,
+                onChange: e => {
+                  setPageSize(parseInt(e.target.value));
+                  setPage(1);
+                },
+                children: [/*#__PURE__*/_jsxDEV("option", {
+                  value: 25,
+                  children: "25 / page"
+                }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                  value: 50,
+                  children: "50 / page"
+                }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                  value: 100,
+                  children: "100 / page"
+                }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                  value: 250,
+                  children: "250 / page"
+                }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
+                  value: 5000,
+                  children: "Show All"
+                }, void 0, false)]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+                className: "btn btn-outline btn-sm",
+                onClick: () => exportRows(filtered, "RIU_Filtered_Stock.xlsx"),
+                children: [/*#__PURE__*/_jsxDEV(Icon, {
+                  name: "download",
+                  size: 14
+                }, void 0, false), " Export Filtered (", filtered.length, ")"]
+              }, void 0, true)]
+            }, void 0, true)]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-table-wrap",
+            children: /*#__PURE__*/_jsxDEV("table", {
+              className: "rd-table",
+              children: [/*#__PURE__*/_jsxDEV("thead", {
+                children: /*#__PURE__*/_jsxDEV("tr", {
+                  children: [/*#__PURE__*/_jsxDEV("th", {
+                    className: "sticky-col"
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("th", {
+                    className: "sticky-col2",
+                    children: "Company"
+                  }, void 0, false), displayCols.filter(c => c.key !== "company").map(c => /*#__PURE__*/_jsxDEV("th", {
+                    children: c.label
+                  }, c.key, false))]
+                }, void 0, true)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("tbody", {
+                children: [pageRows.map(r => {
+                  const isSel = selectedIds.has(r.id);
+                  const bookable = r.balanceWeight > 0.005;
+                  return /*#__PURE__*/_jsxDEV("tr", {
+                    className: isSel ? "selected" : "",
+                    children: [/*#__PURE__*/_jsxDEV("td", {
+                      className: "sticky-col",
+                      children: /*#__PURE__*/_jsxDEV("input", {
+                        type: "checkbox",
+                        className: "rd-chk",
+                        checked: isSel,
+                        disabled: !bookable,
+                        onChange: () => toggleSelect(r)
+                      }, void 0, false)
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("td", {
+                      className: "sticky-col2 txt",
+                      children: r.company
+                    }, void 0, false), displayCols.filter(c => c.key !== "company").map(c => {
+                      let val;
+                      if (c.key === "date") val = fmtDate(r.date);else if (c.key === "shape") {
+                        const st = statusOf(r.shape);
+                        val = /*#__PURE__*/_jsxDEV("span", {
+                          className: "status-pill " + st.cls,
+                          children: st.label
+                        }, void 0, false);
+                      } else if (c.key === "ageing") val = /*#__PURE__*/_jsxDEV("span", {
+                        className: r.ageing >= 365 ? "aged-flag" : "",
+                        children: fmtInt(r.ageing)
+                      }, void 0, false);else if (c.type === "number") val = fmt(r[c.key], c.key === "sno" ? 0 : 2);else val = r[c.key] || "\u2014";
+                      return /*#__PURE__*/_jsxDEV("td", {
+                        className: c.type === "text" ? "txt" : "",
+                        children: val
+                      }, c.key, false);
+                    })]
+                  }, r.id, true);
+                }), pageRows.length === 0 && /*#__PURE__*/_jsxDEV("tr", {
+                  children: /*#__PURE__*/_jsxDEV("td", {
+                    colSpan: displayCols.length + 1,
+                    style: {
+                      textAlign: "center",
+                      padding: 30,
+                      color: "var(--ink-faint)"
+                    },
+                    children: "Koi record match nahi hua. Filters adjust karein."
+                  }, void 0, false)
+                }, void 0, false)]
+              }, void 0, true)]
+            }, void 0, true)
+          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-pagination",
+            children: [/*#__PURE__*/_jsxDEV("button", {
+              className: "rd-page-btn",
+              disabled: page <= 1,
+              onClick: () => setPage(p => p - 1),
+              children: "← Prev"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 12.5,
+                color: "var(--ink-soft)"
+              },
+              children: ["Page ", page, " of ", totalPages]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+              className: "rd-page-btn",
+              disabled: page >= totalPages,
+              onClick: () => setPage(p => p + 1),
+              children: "Next →"
+            }, void 0, false)]
+          }, void 0, true)]
+        }, void 0, true), activeTab === "bookings" && /*#__PURE__*/_jsxDEV("div", {
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "rd-toolbar",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "rd-count",
+              children: [/*#__PURE__*/_jsxDEV("b", {
+                children: bookings.length
+              }, void 0, false), " booking(s) this session · Total booked: ", /*#__PURE__*/_jsxDEV("b", {
+                children: [fmt(bookings.reduce((s, b) => s + b.totalQty, 0), 2), " MT"]
+              }, void 0, true)]
+            }, void 0, true), bookings.length > 0 && /*#__PURE__*/_jsxDEV("button", {
+              className: "btn btn-outline btn-sm",
+              onClick: exportAllBookings,
+              children: [/*#__PURE__*/_jsxDEV(Icon, {
+                name: "download",
+                size: 14
+              }, void 0, false), " Export All Bookings"]
+            }, void 0, true)]
+          }, void 0, true), bookings.length === 0 ? /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-empty",
+            style: {
+              margin: "30px auto"
+            },
+            children: [/*#__PURE__*/_jsxDEV(Icon, {
+              name: "assignment",
+              size: 30,
+              color: "var(--ink-faint)"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("h2", {
+              className: "disp",
+              style: {
+                fontSize: 17
+              },
+              children: "No bookings yet"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("p", {
+              children: "Stock Dashboard tab se coils select karein aur booking cart se save karein. Ek baar save karne ke baad turant agli booking ke liye naye coils select kar sakte hain."
+            }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+              className: "btn btn-accent",
+              onClick: () => setActiveTab("stock"),
+              children: ["Go to Stock Dashboard ", /*#__PURE__*/_jsxDEV(Icon, {
+                name: "arrow_forward",
+                size: 15
+              }, void 0, false)]
+            }, void 0, true)]
+          }, void 0, true) : bookings.map(b => /*#__PURE__*/_jsxDEV(BookingCard, {
+            b: b,
+            onExport: () => exportBooking(b)
+          }, b.id, false))]
+        }, void 0, true)]
+      }, void 0, true)
+    }, void 0, false), records.length > 0 && selectedIds.size > 0 && !cartOpen && /*#__PURE__*/_jsxDEV("button", {
+      className: "fab-cart",
+      onClick: () => setCartOpen(true),
+      children: [/*#__PURE__*/_jsxDEV(Icon, {
+        name: "shopping_cart",
+        size: 18,
+        color: "#fff"
+      }, void 0, false), "Booking Cart", /*#__PURE__*/_jsxDEV("span", {
+        className: "fab-badge",
+        children: selectedIds.size
+      }, void 0, false)]
+    }, void 0, true), cartOpen && /*#__PURE__*/_jsxDEV(React.Fragment, {
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "rd-overlay",
+        onClick: () => setCartOpen(false)
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "rd-drawer",
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          className: "rd-drawer-head",
+          children: [/*#__PURE__*/_jsxDEV("h3", {
+            children: [/*#__PURE__*/_jsxDEV(Icon, {
+              name: "shopping_cart",
+              size: 18
+            }, void 0, false), " New Booking"]
+          }, void 0, true), /*#__PURE__*/_jsxDEV(Icon, {
+            name: "close",
+            size: 20,
+            style: {
+              cursor: "pointer"
+            },
+            onClick: () => setCartOpen(false)
+          }, void 0, false)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          className: "rd-drawer-body",
+          children: [cartItems.length === 0 ? /*#__PURE__*/_jsxDEV("div", {
+            className: "rd-empty-cart",
+            children: "Cart khaali hai. Table se coils select karein."
+          }, void 0, false) : cartItems.map(r => /*#__PURE__*/_jsxDEV("div", {
+            className: "cart-item",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "cart-item-top",
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                children: [/*#__PURE__*/_jsxDEV("div", {
+                  className: "cart-item-name",
+                  children: [r.grade || r.specification, " · ", r.make]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  className: "cart-item-sub",
+                  children: ["Coil ", r.coilNo, " / Yard ", r.yardCoilNo]
+                }, void 0, true)]
+              }, void 0, true), /*#__PURE__*/_jsxDEV(Icon, {
+                name: "delete",
+                size: 17,
+                color: "var(--danger)",
+                style: {
+                  cursor: "pointer",
+                  flexShrink: 0
+                },
+                onClick: () => removeFromCart(r.id)
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "cart-qty-row",
+              children: [/*#__PURE__*/_jsxDEV("input", {
+                type: "number",
+                step: "0.01",
+                min: "0",
+                max: r.balanceWeight,
+                value: cartQty[r.id] !== undefined ? cartQty[r.id] : r.balanceWeight,
+                onChange: e => setQty(r.id, e.target.value, r.balanceWeight)
+              }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+                children: ["MT of ", fmt(r.balanceWeight, 2), " MT available"]
+              }, void 0, true)]
+            }, void 0, true)]
+          }, r.id, true)), /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              marginTop: 18,
+              borderTop: "1px solid var(--border)",
+              paddingTop: 16
+            },
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              className: "rd-form-field",
+              children: [/*#__PURE__*/_jsxDEV("label", {
+                children: [/*#__PURE__*/_jsxDEV(Icon, {
+                  name: "apartment",
+                  size: 13
+                }, void 0, false), " Party Name *"]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("input", {
+                value: bkParty,
+                onChange: e => setBkParty(e.target.value),
+                placeholder: "e.g. S.K Agarwal & Co"
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "rd-form-field",
+              children: [/*#__PURE__*/_jsxDEV("label", {
+                children: [/*#__PURE__*/_jsxDEV(Icon, {
+                  name: "event",
+                  size: 13
+                }, void 0, false), " Booking Date"]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("input", {
+                type: "date",
+                value: bkDate,
+                onChange: e => setBkDate(e.target.value)
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "rd-form-field",
+              children: [/*#__PURE__*/_jsxDEV("label", {
+                children: [/*#__PURE__*/_jsxDEV(Icon, {
+                  name: "local_shipping",
+                  size: 13
+                }, void 0, false), " Vehicle No (optional)"]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("input", {
+                value: bkVehicle,
+                onChange: e => setBkVehicle(e.target.value),
+                placeholder: "RJ14 ..."
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              className: "rd-form-field",
+              children: [/*#__PURE__*/_jsxDEV("label", {
+                children: "Remarks"
+              }, void 0, false), /*#__PURE__*/_jsxDEV("textarea", {
+                rows: 2,
+                value: bkRemarks,
+                onChange: e => setBkRemarks(e.target.value),
+                placeholder: "Optional note"
+              }, void 0, false)]
+            }, void 0, true), bkError && /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                color: "var(--danger)",
+                fontSize: 12,
+                marginBottom: 8
+              },
+              children: bkError
+            }, void 0, false)]
+          }, void 0, true)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          className: "rd-drawer-foot",
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "rd-total-row",
+            children: [/*#__PURE__*/_jsxDEV("span", {
+              children: "Total Booking Qty"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("b", {
+              children: [fmt(cartTotalQty, 2), " MT"]
+            }, void 0, true)]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              display: "flex",
+              gap: 8
+            },
+            children: [/*#__PURE__*/_jsxDEV("button", {
+              className: "btn btn-outline",
+              style: {
+                flex: 1,
+                justifyContent: "center"
+              },
+              onClick: () => setCartOpen(false),
+              children: "Cancel"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+              className: "btn btn-accent",
+              style: {
+                flex: 2,
+                justifyContent: "center"
+              },
+              onClick: saveBooking,
+              children: [/*#__PURE__*/_jsxDEV(Icon, {
+                name: "check_circle",
+                size: 16
+              }, void 0, false), " Save Booking"]
+            }, void 0, true)]
+          }, void 0, true)]
+        }, void 0, true)]
+      }, void 0, true)]
+    }, void 0, true), toast && /*#__PURE__*/_jsxDEV("div", {
+      className: "toast",
+      children: [/*#__PURE__*/_jsxDEV(Icon, {
+        name: "check_circle",
+        size: 16
+      }, void 0, false), " ", toast]
+    }, void 0, true)]
+  }, void 0, true);
 }
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/_jsxDEV(App, {}, void 0, false));
 </script>
 </body>
 </html>
